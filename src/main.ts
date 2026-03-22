@@ -666,13 +666,23 @@ server.registerTool(
         );
       }
 
-      // Snapshot for verification
-      const preWriteText = existingNote.text;
       const preWriteTags = getNoteTags(id);
+      const newTagsLower = tags.map((t) => t.toLowerCase());
+
+      // Skip the write entirely if all requested tags already exist
+      const alreadyPresent = newTagsLower.every((t) => preWriteTags.includes(t));
+      if (alreadyPresent) {
+        const tagList = tags.map((t) => `#${t}`).join(', ');
+        return createToolResponse(
+          `Tags already present on note "${existingNote.title}".\n\nTags: ${tagList}\nNote ID: ${id}`
+        );
+      }
+
+      const preWriteText = existingNote.text;
 
       // Combine existing and new tags, then append at end of body.
       // Bear's native add-tag prepends #tag above everything, corrupting YAML notes.
-      const allTags = [...new Set([...preWriteTags, ...tags.map((t) => t.toLowerCase())])];
+      const allTags = [...new Set([...preWriteTags, ...newTagsLower])];
       const bodyWithNewTags = appendTagsToBody(existingNote.text, allTags);
 
       const url = buildBearUrl('add-text', {
