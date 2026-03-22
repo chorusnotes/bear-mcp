@@ -56,3 +56,37 @@ export interface BearTag {
   noteCount: number;
   children: BearTag[];
 }
+
+/**
+ * Input for Chorus conventions enforcement on create paths.
+ */
+export interface ChorusConventionsInput {
+  text: string | undefined;
+  tags: string | undefined;
+  title: string | undefined;
+}
+
+/**
+ * Output from Chorus conventions enforcement.
+ * Tags are embedded in body text, not passed as URL params.
+ */
+export interface ChorusConventionsOutput {
+  text: string;
+  tags: undefined;
+}
+
+/**
+ * A specific Chorus structure rule that was violated.
+ */
+export interface ChorusViolation {
+  rule: 'missing_yaml' | 'yaml_field_order' | 'missing_h1' | 'tags_not_mirrored';
+  message: string;
+}
+
+/**
+ * Result of validating a note body against Chorus conventions.
+ */
+export interface ChorusValidationResult {
+  valid: boolean;
+  violations: ChorusViolation[];
+}
