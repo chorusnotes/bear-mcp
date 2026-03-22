@@ -369,11 +369,11 @@ export function spliceSection(fullBody: string, header: string, newContent: stri
     }
   }
 
-  // Reconstruct: before + header + new content + after
+  // Reconstruct: before + header + blank line + new content + after
   const before = lines.slice(0, targetIndex + 1);
   const after = lines.slice(endIndex);
 
-  return [...before, newContent, ...after].join('\n');
+  return [...before, '', newContent, ...after].join('\n');
 }
 
 /**

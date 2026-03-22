@@ -195,6 +195,12 @@ describe('spliceSection', () => {
     expect(result).toContain('tags: [chorus/questions]\n---');
   });
 
+  it('inserts blank line between header and replacement content', () => {
+    const result = spliceSection(chorusNote, 'Details', 'Updated details.');
+
+    expect(result).toContain('## Details\n\nUpdated details.');
+  });
+
   it('returns body unchanged when header not found', () => {
     const result = spliceSection(chorusNote, 'Nonexistent', 'New content.');
 

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { setTimeout as wait } from 'node:timers/promises';
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -668,9 +670,10 @@ server.registerTool(
       const preWriteText = existingNote.text;
       const preWriteTags = getNoteTags(id);
 
-      // Append new tag text at the end of the body to preserve frontmatter and title.
+      // Combine existing and new tags, then append at end of body.
       // Bear's native add-tag prepends #tag above everything, corrupting YAML notes.
-      const bodyWithNewTags = appendTagsToBody(existingNote.text, tags);
+      const allTags = [...new Set([...preWriteTags, ...tags.map((t) => t.toLowerCase())])];
+      const bodyWithNewTags = appendTagsToBody(existingNote.text, allTags);
 
       const url = buildBearUrl('add-text', {
         id,
@@ -683,9 +686,7 @@ server.registerTool(
 
       await executeBearXCallbackApi(url);
 
-      // Verify — expect all old tags plus the new ones
-      const allExpectedTags = [...preWriteTags, ...tags.map((t) => t.toLowerCase())];
-      const verification = await verifyNoteAfterWrite(id, preWriteText, allExpectedTags);
+      const verification = await verifyNoteAfterWrite(id, preWriteText, allTags);
 
       const tagList = tags.map((t) => `#${t}`).join(', ');
 
@@ -915,7 +916,8 @@ server.registerTool(
       let resolvedId = id;
 
       if (!existingNote && title) {
-        const { notes } = searchNotes(title);
+        // High limit to avoid missing exact matches when many notes contain the search term
+        const { notes } = searchNotes(title, undefined, 10_000);
         // Exact title matches only
         const exactMatches = notes.filter((n) => n.title.toLowerCase() === title.toLowerCase());
 
@@ -1039,7 +1041,6 @@ server.registerTool(
       await executeBearXCallbackApi(url);
 
       // Verify the note is actually trashed via SQLite
-      const { setTimeout: wait } = await import('node:timers/promises');
       const deadline = Date.now() + 2_000;
 
       while (Date.now() < deadline) {
