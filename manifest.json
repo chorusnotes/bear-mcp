@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "bear-notes-chorus",
   "display_name": "Bear Notes (Chorus Fork)",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "icon": "icon.png",
   "screenshots": ["screenshots/search-demo.png"],
   "description": "Bear Notes MCP with read-after-write verification. Fork with verified writes, tag preservation, and upsert support.",
