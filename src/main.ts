@@ -159,28 +159,25 @@ server.registerTool(
 
       await executeBearXCallbackApi(url);
 
-      const createdNoteId = title ? await awaitNoteCreation(title) : undefined;
-
-      const responseLines: string[] = ['Bear note created successfully!', ''];
-
-      if (title) {
-        responseLines.push(`Title: "${title}"`);
-      }
-
-      if (tags) {
-        responseLines.push(`Tags: ${tags}`);
-      }
+      // Poll for the note ID, then read back to verify
+      const h1Match = text?.match(/^#\s+(.+?)\s*$/m);
+      const pollTitle = title || h1Match?.[1];
+      const createdNoteId = pollTitle ? await awaitNoteCreation(pollTitle) : undefined;
 
       if (createdNoteId) {
+        const createdNote = getNoteContent(createdNoteId);
+        const responseLines: string[] = ['Note created (verified).', ''];
+        responseLines.push(`Title: "${createdNote?.title}"`);
+        if (tags) responseLines.push(`Tags: ${tags}`);
         responseLines.push(`Note ID: ${createdNoteId}`);
+        return createToolResponse(responseLines.join('\n'));
       }
 
-      const hasContent = title || text || tags;
-      const finalMessage = hasContent ? responseLines.join('\n') : 'Empty note created';
-
-      return createToolResponse(`${finalMessage}
-
-The note has been added to your Bear Notes library.`);
+      // Fallback: couldn't retrieve ID but the create was dispatched
+      const responseLines: string[] = ['Note created.', ''];
+      if (title) responseLines.push(`Title: "${title}"`);
+      if (tags) responseLines.push(`Tags: ${tags}`);
+      return createToolResponse(responseLines.join('\n'));
     } catch (error) {
       logger.error('bear-create-note failed:', error);
       throw error;
@@ -947,17 +944,21 @@ server.registerTool(
           `Note replaced and verified.\n\nNote ID: ${resolvedId}\nTitle: "${updatedNote?.title}"\n\n---\n\n${noteBody}`
         );
       } else {
-        // Create new note
+        // Create new note — pass title explicitly so Bear's ZTITLE matches our poll
+        const h1Match = text.match(/^#\s+(.+?)\s*$/m);
+        const noteTitle = title || h1Match?.[1];
+
         const { text: createText, tags: createTags } = ENABLE_NEW_NOTE_CONVENTIONS
           ? applyNoteConventions({ text, tags })
           : { text, tags };
 
-        const url = buildBearUrl('create', { text: createText, tags: createTags });
+        const url = buildBearUrl('create', {
+          title: noteTitle,
+          text: createText,
+          tags: createTags,
+        });
         await executeBearXCallbackApi(url);
 
-        // Extract title from H1 in body for creation polling
-        const h1Match = text.match(/^#\s+(.+)$/m);
-        const noteTitle = title || h1Match?.[1];
         const createdId = noteTitle ? await awaitNoteCreation(noteTitle) : undefined;
 
         if (createdId) {
