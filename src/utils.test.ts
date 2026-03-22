@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  appendTagsToBody,
   convertCoreDataTimestamp,
   noteHasHeader,
   parseDateString,
+  spliceSection,
   stripLeadingHeader,
 } from './utils.js';
 
@@ -134,5 +136,100 @@ describe('convertCoreDataTimestamp', () => {
     const result = convertCoreDataTimestamp(0);
 
     expect(result).toBe('2001-01-01T00:00:00.000Z');
+  });
+});
+
+describe('spliceSection', () => {
+  const chorusNote = [
+    '---',
+    'type: question',
+    'summary: Test question',
+    'tags: [chorus/questions]',
+    '---',
+    '# What is gravity?',
+    'Gravity is a fundamental force.',
+    '',
+    '## Details',
+    'More details here.',
+    'And another line.',
+    '',
+    '## References',
+    'Some references.',
+  ].join('\n');
+
+  it('replaces H1 section content (the doubling bug fix)', () => {
+    const result = spliceSection(chorusNote, 'What is gravity?', 'Gravity pulls things down.');
+
+    expect(result).toContain('# What is gravity?');
+    expect(result).toContain('Gravity pulls things down.');
+    expect(result).not.toContain('Gravity is a fundamental force.');
+    // Sibling sections preserved
+    expect(result).toContain('## Details');
+    expect(result).toContain('## References');
+  });
+
+  it('replaces a mid-level section without touching siblings', () => {
+    const result = spliceSection(chorusNote, 'Details', 'Updated details.');
+
+    expect(result).toContain('## Details');
+    expect(result).toContain('Updated details.');
+    expect(result).not.toContain('More details here.');
+    // H1 and other sections preserved
+    expect(result).toContain('# What is gravity?');
+    expect(result).toContain('## References');
+  });
+
+  it('replaces the last section (no following header)', () => {
+    const result = spliceSection(chorusNote, 'References', 'New references.');
+
+    expect(result).toContain('## References');
+    expect(result).toContain('New references.');
+    expect(result).not.toContain('Some references.');
+  });
+
+  it('preserves YAML frontmatter when splicing H1', () => {
+    const result = spliceSection(chorusNote, 'What is gravity?', 'New content.');
+
+    expect(result).toContain('---\ntype: question');
+    expect(result).toContain('tags: [chorus/questions]\n---');
+  });
+
+  it('returns body unchanged when header not found', () => {
+    const result = spliceSection(chorusNote, 'Nonexistent', 'New content.');
+
+    expect(result).toBe(chorusNote);
+  });
+
+  it('matches headers case-insensitively', () => {
+    const result = spliceSection(chorusNote, 'DETAILS', 'Updated.');
+
+    expect(result).toContain('Updated.');
+    expect(result).not.toContain('More details here.');
+  });
+});
+
+describe('appendTagsToBody', () => {
+  it('appends tags as inline Bear syntax at end of body', () => {
+    const result = appendTagsToBody('Note content here.', ['chorus/questions', 'science']);
+
+    expect(result).toBe('Note content here.\n\n#chorus/questions #science');
+  });
+
+  it('handles multi-word tags with closing hash', () => {
+    const result = appendTagsToBody('Body.', ['my tag']);
+
+    expect(result).toBe('Body.\n\n#my tag#');
+  });
+
+  it('returns body unchanged when tags array is empty', () => {
+    const result = appendTagsToBody('Body.', []);
+
+    expect(result).toBe('Body.');
+  });
+
+  it('handles single tag', () => {
+    const result = appendTagsToBody('Body.', ['chorus']);
+
+    expect(result).toBe('Body.\n\n#chorus');
   });
 });

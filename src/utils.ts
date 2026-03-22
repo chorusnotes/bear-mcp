@@ -322,11 +322,15 @@ export function spliceSection(fullBody: string, header: string, newContent: stri
 
   if (targetIndex === -1) return fullBody;
 
-  // Find the end of this section (next same-or-higher-level header, or EOF)
+  // Find the end of this section.
+  // H1 is the document title — its "section" is the intro before the first sub-header,
+  // so any subsequent header (H2+) marks the boundary. For other levels, stop at
+  // same-or-higher-level headers as standard markdown section semantics.
+  const sectionEndLevel = targetLevel === 1 ? 6 : targetLevel;
   let endIndex = lines.length;
   for (let i = targetIndex + 1; i < lines.length; i++) {
     const match = lines[i].match(/^(#{1,6})\s+/);
-    if (match && match[1].length <= targetLevel) {
+    if (match && match[1].length <= sectionEndLevel) {
       endIndex = i;
       break;
     }
