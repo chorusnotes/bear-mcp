@@ -396,23 +396,17 @@ Check the note content with bear-open-note to see available sections.`);
     let bearHeader: string | undefined = cleanHeader;
 
     if (mode === 'replace') {
-      // H1 fix: Bear's mode=replace with H1 header appends instead of replacing.
-      // Detect this case and use splice + replace_all instead.
       if (cleanHeader && existingNote.text) {
-        const h1Match = existingNote.text.match(/^(#)\s+(.+?)\s*$/m);
-        const isH1 = h1Match && h1Match[2].toLowerCase() === cleanHeader.toLowerCase();
-
-        if (isH1) {
-          logger.info('H1 header detected — using splice + replace_all path to avoid append bug');
-          const splicedBody = spliceSection(existingNote.text, cleanHeader, cleanText);
-          cleanText = appendTagsToBody(splicedBody, preWriteTags);
-          bearMode = 'replace_all';
-          bearHeader = undefined;
-        }
-      }
-
-      // Full-body replace: use replace_all with tag preservation
-      if (!header) {
+        // All section replaces use splice + replace_all to avoid Bear API quirks:
+        // - H1 targets append instead of replacing
+        // - Last-section targets consume trailing inline tags
+        logger.info('Section replace — using splice + replace_all path');
+        const splicedBody = spliceSection(existingNote.text, cleanHeader, cleanText);
+        cleanText = appendTagsToBody(splicedBody, preWriteTags);
+        bearMode = 'replace_all';
+        bearHeader = undefined;
+      } else if (!header) {
+        // Full-body replace: use replace_all with tag preservation
         cleanText = appendTagsToBody(cleanText, preWriteTags);
         bearMode = 'replace_all';
       }
