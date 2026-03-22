@@ -28,9 +28,7 @@ describe('validateChorusStructure', () => {
     const result = validateChorusStructure(note);
 
     expect(result.valid).toBe(false);
-    expect(result.violations).toContainEqual(
-      expect.objectContaining({ rule: 'missing_yaml' })
-    );
+    expect(result.violations).toContainEqual(expect.objectContaining({ rule: 'missing_yaml' }));
   });
 
   it('rejects note with wrong YAML field order (summary before type)', () => {
@@ -48,9 +46,7 @@ describe('validateChorusStructure', () => {
     const result = validateChorusStructure(note);
 
     expect(result.valid).toBe(false);
-    expect(result.violations).toContainEqual(
-      expect.objectContaining({ rule: 'yaml_field_order' })
-    );
+    expect(result.violations).toContainEqual(expect.objectContaining({ rule: 'yaml_field_order' }));
   });
 
   it('rejects note without H1 after YAML', () => {
@@ -68,9 +64,7 @@ describe('validateChorusStructure', () => {
     const result = validateChorusStructure(note);
 
     expect(result.valid).toBe(false);
-    expect(result.violations).toContainEqual(
-      expect.objectContaining({ rule: 'missing_h1' })
-    );
+    expect(result.violations).toContainEqual(expect.objectContaining({ rule: 'missing_h1' }));
   });
 
   it('rejects note where YAML tags do not mirror inline tags', () => {
@@ -122,9 +116,7 @@ describe('validateChorusStructure', () => {
     expect(result.valid).toBe(false);
     // At minimum, missing_yaml — other rules only fire when YAML is present
     expect(result.violations.length).toBeGreaterThanOrEqual(1);
-    expect(result.violations).toContainEqual(
-      expect.objectContaining({ rule: 'missing_yaml' })
-    );
+    expect(result.violations).toContainEqual(expect.objectContaining({ rule: 'missing_yaml' }));
   });
 
   it('collects field order + missing H1 + tag mismatch together', () => {

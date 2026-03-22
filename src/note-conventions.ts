@@ -39,6 +39,15 @@ function parseYamlBlock(text: string): ParsedFrontmatter | null {
   return fields;
 }
 
+/** Splits a comma-separated tag string into a lowercased, trimmed array. */
+function parseCsvTags(csv: string | undefined): string[] {
+  if (!csv) return [];
+  return csv
+    .split(',')
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 /** Parses a YAML inline array like `[chorus/questions, chorus]` into a lowercased string array. */
 function parseYamlTagsField(value: string): string[] {
   const inner = value.replace(/^\[/, '').replace(/\]$/, '');
@@ -119,9 +128,7 @@ export function validateChorusStructure(text: string): ChorusValidationResult {
   if (yaml) {
     const keys = [...yaml.keys()];
     const expected = CHORUS_YAML_FIELD_ORDER.filter((f) => keys.includes(f));
-    const actual = keys.filter((k) =>
-      (CHORUS_YAML_FIELD_ORDER as readonly string[]).includes(k)
-    );
+    const actual = keys.filter((k) => (CHORUS_YAML_FIELD_ORDER as readonly string[]).includes(k));
     if (JSON.stringify(actual) !== JSON.stringify(expected)) {
       violations.push({
         rule: 'yaml_field_order',
@@ -182,20 +189,13 @@ export function applyChorusConventions(input: ChorusConventionsInput): ChorusCon
   const title = input.title?.trim() || 'Untitled';
 
   // 1. Parse tags from comma-separated param, lowercase
-  const paramTags = input.tags
-    ? input.tags
-        .split(',')
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean)
-    : [];
+  const paramTags = parseCsvTags(input.tags);
 
   // 2. Parse existing YAML if present
   const existingYaml = parseYamlBlock(rawText);
 
   // 3. Merge tags: YAML tags + param tags, deduped
-  const yamlTags = existingYaml?.has('tags')
-    ? parseYamlTagsField(existingYaml.get('tags')!)
-    : [];
+  const yamlTags = existingYaml?.has('tags') ? parseYamlTagsField(existingYaml.get('tags')!) : [];
   const allTags = [...new Set([...yamlTags, ...paramTags])];
 
   // 4. Build YAML block with fields in canonical order
@@ -216,7 +216,10 @@ export function applyChorusConventions(input: ChorusConventionsInput): ChorusCon
   if (existingYaml) {
     const lines = rawText.split('\n');
     const closingIdx = lines.findIndex((l, i) => i > 0 && l.trim() === '---');
-    bodyContent = lines.slice(closingIdx + 1).join('\n').trim();
+    bodyContent = lines
+      .slice(closingIdx + 1)
+      .join('\n')
+      .trim();
   } else {
     bodyContent = rawText.trim();
   }

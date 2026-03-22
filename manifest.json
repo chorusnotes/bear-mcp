@@ -26,7 +26,7 @@
       ],
       "env": {
         "UI_DEBUG_TOGGLE": "${user_config.debug}",
-        "UI_ENABLE_NEW_NOTE_CONVENTION": "${user_config.enable_new_note_convention}",
+        "UI_ENABLE_CHORUS_CONVENTIONS": "${user_config.enable_chorus_conventions}",
         "UI_ENABLE_CONTENT_REPLACEMENT": "${user_config.enable_content_replacement}"
       }
     }
@@ -39,10 +39,10 @@
       "default": false,
       "required": false
     },
-    "enable_new_note_convention": {
+    "enable_chorus_conventions": {
       "type": "boolean",
-      "title": "New Note Convention",
-      "description": "Place tags right after the note title instead of at the end (default Bear behavior) when creating new notes",
+      "title": "Chorus Conventions",
+      "description": "Enforce Chorus note structure (YAML frontmatter, H1 title, tag mirroring) on create and upsert operations. Validates structure on replace.",
       "default": false,
       "required": false
     },
@@ -110,6 +110,10 @@
     {
       "name": "bear-trash-note",
       "description": "Move a note to Bear's trash with database verification that the trash operation succeeded"
+    },
+    {
+      "name": "bear-get-tags",
+      "description": "Get the tags assigned to a Bear note without reading the full content"
     }
   ],
   "keywords": [

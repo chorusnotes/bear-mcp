@@ -6,8 +6,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 
-import { APP_VERSION, ENABLE_CONTENT_REPLACEMENT, ENABLE_NEW_NOTE_CONVENTIONS } from './config.js';
-import { applyNoteConventions } from './note-conventions.js';
+import { APP_VERSION, ENABLE_CHORUS_CONVENTIONS, ENABLE_CONTENT_REPLACEMENT } from './config.js';
+import { applyChorusConventions, validateChorusStructure } from './note-conventions.js';
 import {
   appendTagsToBody,
   cleanBase64,
@@ -153,9 +153,8 @@ server.registerTool(
     );
 
     try {
-      // If ENABLE_NOTE_CONVENTIONS is true, embed tags in the text body using Bear's inline tag syntax, rather than passing as URL parameters
-      const { text: createText, tags: createTags } = ENABLE_NEW_NOTE_CONVENTIONS
-        ? applyNoteConventions({ text, tags })
+      const { text: createText, tags: createTags } = ENABLE_CHORUS_CONVENTIONS
+        ? applyChorusConventions({ text, tags, title })
         : { text, tags };
 
       const url = buildBearUrl('create', { title, text: createText, tags: createTags });
@@ -946,6 +945,17 @@ server.registerTool(
       }
 
       if (existingNote && resolvedId) {
+        // Chorus conventions: validate structure before replacing
+        if (ENABLE_CHORUS_CONVENTIONS) {
+          const validation = validateChorusStructure(text);
+          if (!validation.valid) {
+            const details = validation.violations.map((v) => `- ${v.message}`).join('\n');
+            return createToolResponse(
+              `Chorus conventions validation failed.\n\n${details}\n\nFix the above issues and retry.`
+            );
+          }
+        }
+
         // Replace existing note
         const preWriteText = existingNote.text ?? '';
         const preWriteTags = getNoteTags(resolvedId);
@@ -991,8 +1001,8 @@ server.registerTool(
         const noteTitle = title || h1Match?.[1];
         const bodyForCreate = noteTitle ? stripLeadingHeader(text, noteTitle) : text;
 
-        const { text: createText, tags: createTags } = ENABLE_NEW_NOTE_CONVENTIONS
-          ? applyNoteConventions({ text: bodyForCreate, tags })
+        const { text: createText, tags: createTags } = ENABLE_CHORUS_CONVENTIONS
+          ? applyChorusConventions({ text: bodyForCreate, tags, title: noteTitle })
           : { text: bodyForCreate, tags };
 
         const url = buildBearUrl('create', {
@@ -1079,6 +1089,47 @@ server.registerTool(
       );
     } catch (error) {
       logger.error('bear-trash-note failed:', error);
+      throw error;
+    }
+  }
+);
+
+server.registerTool(
+  'bear-get-tags',
+  {
+    title: 'Get Note Tags',
+    description:
+      'Get the tags assigned to a Bear note without reading the full content. Returns a lightweight tag list for quick triage and filtering.',
+    inputSchema: {
+      id: z
+        .string()
+        .trim()
+        .min(1, 'Note ID is required')
+        .describe('Note identifier (ID) from bear-search-notes'),
+    },
+    annotations: {
+      readOnlyHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async ({ id }): Promise<CallToolResult> => {
+    logger.info(`bear-get-tags called with id: ${id}`);
+
+    try {
+      const existingNote = getNoteContent(id);
+      if (!existingNote) {
+        return createToolResponse(
+          `Note with ID '${id}' not found.\n\nUse bear-search-notes to find the correct identifier.`
+        );
+      }
+
+      const tags = getNoteTags(id);
+      const tagList = tags.length > 0 ? tags.map((t) => `#${t}`).join(', ') : '(no tags)';
+
+      return createToolResponse(`Note: "${existingNote.title}"\nID: ${id}\nTags: ${tagList}`);
+    } catch (error) {
+      logger.error('bear-get-tags failed:', error);
       throw error;
     }
   }

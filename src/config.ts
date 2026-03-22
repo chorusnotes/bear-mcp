@@ -6,8 +6,7 @@ export const DEFAULT_SEARCH_LIMIT = 50;
 export const BEAR_DATABASE_PATH =
   'Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data/database.sqlite';
 
-export const ENABLE_CHORUS_CONVENTIONS =
-  process.env.UI_ENABLE_CHORUS_CONVENTIONS === 'true';
+export const ENABLE_CHORUS_CONVENTIONS = process.env.UI_ENABLE_CHORUS_CONVENTIONS === 'true';
 
 export const CHORUS_YAML_FIELD_ORDER = ['type', 'summary', 'tags'] as const;
 export const ENABLE_CONTENT_REPLACEMENT = process.env.UI_ENABLE_CONTENT_REPLACEMENT === 'true';
