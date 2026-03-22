@@ -28,6 +28,24 @@ export interface DateFilter {
 }
 
 /**
+ * Describes why a write verification failed.
+ * Each failure mode corresponds to a documented Bear API quirk.
+ */
+export interface VerificationFailure {
+  type: 'doubled' | 'unchanged' | 'tags_missing';
+  message: string;
+}
+
+/**
+ * Result of a post-write verification check against SQLite.
+ */
+export interface VerificationResult {
+  success: boolean;
+  noteText?: string | undefined;
+  failures: VerificationFailure[];
+}
+
+/**
  * Represents a Bear tag with hierarchy support.
  * Tags form a tree structure where nested tags like "career/content/blog"
  * become children of their parent tags.

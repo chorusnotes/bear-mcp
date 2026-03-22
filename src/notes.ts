@@ -315,6 +315,63 @@ export function searchNotes(
 }
 
 /**
+ * Retrieves decoded tag names for a specific note via the Z_5TAGS join table.
+ * Used by the verification layer to detect tag wipe after full-body replace.
+ */
+export function getNoteTags(noteIdentifier: string): string[] {
+  const db = openBearDatabase();
+
+  try {
+    const query = `
+      SELECT LOWER(TRIM(REPLACE(t.ZTITLE, '+', ' '))) as tagName
+      FROM ZSFNOTETAG t
+      JOIN Z_5TAGS nt ON nt.Z_13TAGS = t.Z_PK
+      JOIN ZSFNOTE note ON note.Z_PK = nt.Z_5NOTES
+      WHERE note.ZUNIQUEIDENTIFIER = ?
+        AND note.ZTRASHED = 0
+        AND note.ZARCHIVED = 0
+    `;
+
+    const stmt = db.prepare(query);
+    const rows = stmt.all(noteIdentifier) as Array<{ tagName: string }>;
+    return rows.map((row) => row.tagName);
+  } catch (error) {
+    logger.error(`getNoteTags failed for ${noteIdentifier}: ${error}`);
+    return [];
+  } finally {
+    closeBearDatabase(db);
+  }
+}
+
+/**
+ * Reads a note's ZTEXT and ZTRASHED status, including trashed notes.
+ * Used by verification (post-write read-back) and trash confirmation.
+ */
+export function getNoteRaw(identifier: string): { text: string | null; trashed: boolean } | null {
+  const db = openBearDatabase();
+
+  try {
+    const stmt = db.prepare(`
+      SELECT ZTEXT as text, ZTRASHED as trashed
+      FROM ZSFNOTE
+      WHERE ZUNIQUEIDENTIFIER = ?
+        AND ZARCHIVED = 0
+        AND ZENCRYPTED = 0
+    `);
+
+    const row = stmt.get(identifier) as { text: string | null; trashed: number } | undefined;
+    if (!row) return null;
+
+    return { text: row.text, trashed: row.trashed === 1 };
+  } catch (error) {
+    logger.error(`getNoteRaw failed for ${identifier}: ${error}`);
+    return null;
+  } finally {
+    closeBearDatabase(db);
+  }
+}
+
+/**
  * Polls Bear's SQLite database for the identifier of a recently created note.
  * Designed for use after bear-create-note fires the URL API — the note creation already
  * succeeded, so errors here degrade gracefully to null instead of throwing.

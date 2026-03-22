@@ -1,9 +1,15 @@
+import { setTimeout } from 'node:timers/promises';
+
 import createDebug from 'debug';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 import { CORE_DATA_EPOCH_OFFSET } from './config.js';
-import { getNoteContent } from './notes.js';
+import { getNoteContent, getNoteRaw, getNoteTags } from './notes.js';
 import { buildBearUrl, executeBearXCallbackApi } from './bear-urls.js';
+import type { VerificationFailure, VerificationResult } from './types.js';
+
+const VERIFY_POLL_INTERVAL_MS = 25;
+const VERIFY_POLL_TIMEOUT_MS = 2_000;
 
 export const logger = {
   debug: createDebug('bear-notes-mcp:debug'),
@@ -178,8 +184,165 @@ export function noteHasHeader(noteText: string, header: string): boolean {
 }
 
 /**
+ * Counts occurrences of YAML frontmatter blocks (--- delimited) in a note body.
+ * A doubled note will have two frontmatter blocks where one is expected.
+ */
+function countYamlFrontmatter(text: string): number {
+  const matches = text.match(/^---\s*$/gm);
+  if (!matches) return 0;
+  // Each frontmatter block uses two --- markers; count pairs
+  return Math.floor(matches.length / 2);
+}
+
+/**
+ * Counts H1 headers (lines starting with "# ") in a note body.
+ * A doubled note will have duplicate H1 headers.
+ */
+function countH1Headers(text: string): number {
+  const matches = text.match(/^# .+$/gm);
+  return matches?.length ?? 0;
+}
+
+/**
+ * Polls SQLite after a write to verify the note reflects expected changes.
+ * Detects three failure modes: doubled content, silent no-op, and tag wipe.
+ */
+export async function verifyNoteAfterWrite(
+  noteId: string,
+  preWriteText: string,
+  preWriteTags: string[]
+): Promise<VerificationResult> {
+  const deadline = Date.now() + VERIFY_POLL_TIMEOUT_MS;
+  let lastText: string | null = null;
+
+  // Poll until the note text changes or we time out
+  while (Date.now() < deadline) {
+    const raw = getNoteRaw(noteId);
+    if (!raw) {
+      return {
+        success: false,
+        failures: [{ type: 'unchanged', message: 'Note not found after write' }],
+      };
+    }
+
+    lastText = raw.text;
+
+    // Text changed — stop polling and run checks
+    if (lastText !== preWriteText) break;
+
+    await setTimeout(VERIFY_POLL_INTERVAL_MS);
+  }
+
+  const failures: VerificationFailure[] = [];
+
+  // Check 1: unchanged (write was a no-op)
+  if (lastText === preWriteText) {
+    failures.push({
+      type: 'unchanged',
+      message: 'Note text is unchanged after write — the operation may have been silently ignored',
+    });
+  }
+
+  // Check 2: doubled content (append-instead-of-replace)
+  if (lastText) {
+    const yamlCount = countYamlFrontmatter(lastText);
+    const h1Count = countH1Headers(lastText);
+
+    if (yamlCount > 1) {
+      failures.push({
+        type: 'doubled',
+        message: `Note contains ${yamlCount} YAML frontmatter blocks (expected 1) — content was likely appended instead of replaced`,
+      });
+    }
+    if (h1Count > 1) {
+      failures.push({
+        type: 'doubled',
+        message: `Note contains ${h1Count} H1 headers (expected 1) — content was likely doubled`,
+      });
+    }
+  }
+
+  // Check 3: tags missing (wipe from full-body replace)
+  if (preWriteTags.length > 0) {
+    const postWriteTags = getNoteTags(noteId);
+    const missing = preWriteTags.filter((t) => !postWriteTags.includes(t));
+    if (missing.length > 0) {
+      failures.push({
+        type: 'tags_missing',
+        message: `Tags lost after write: ${missing.map((t) => `#${t}`).join(', ')}`,
+      });
+    }
+  }
+
+  return {
+    success: failures.length === 0,
+    noteText: lastText ?? undefined,
+    failures,
+  };
+}
+
+/**
+ * Converts tag names to Bear inline syntax and appends them to body text.
+ * Used during full-body replace to prevent tag wipe from Bear's dual-storage model.
+ */
+export function appendTagsToBody(body: string, tags: string[]): string {
+  if (tags.length === 0) return body;
+
+  const tagLine = tags
+    .map((t) => {
+      const needsClosingHash = t.includes(' ');
+      return needsClosingHash ? `#${t}#` : `#${t}`;
+    })
+    .join(' ');
+
+  return `${body}\n\n${tagLine}`;
+}
+
+/**
+ * Splices new section content into a full note body at the position of a given header.
+ * Replaces everything between the matched header and the next same-or-higher-level header
+ * (or end of document). Handles YAML frontmatter correctly.
+ */
+export function spliceSection(fullBody: string, header: string, newContent: string): string {
+  const cleanHeader = header.replace(/^#+\s*/, '');
+  const lines = fullBody.split('\n');
+
+  // Find the target header and its level
+  let targetIndex = -1;
+  let targetLevel = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(/^(#{1,6})\s+(.+?)\s*$/);
+    if (match && match[2].toLowerCase() === cleanHeader.toLowerCase()) {
+      targetIndex = i;
+      targetLevel = match[1].length;
+      break;
+    }
+  }
+
+  if (targetIndex === -1) return fullBody;
+
+  // Find the end of this section (next same-or-higher-level header, or EOF)
+  let endIndex = lines.length;
+  for (let i = targetIndex + 1; i < lines.length; i++) {
+    const match = lines[i].match(/^(#{1,6})\s+/);
+    if (match && match[1].length <= targetLevel) {
+      endIndex = i;
+      break;
+    }
+  }
+
+  // Reconstruct: before + header + new content + after
+  const before = lines.slice(0, targetIndex + 1);
+  const after = lines.slice(endIndex);
+
+  return [...before, newContent, ...after].join('\n');
+}
+
+/**
  * Shared handler for note text operations (append, prepend, or replace).
  * Consolidates common validation, execution, and response logic.
+ * After every write, verifies the result via SQLite read-back.
  *
  * @param mode - Whether to append, prepend, or replace text
  * @param params - Note ID, text content, and optional header
@@ -203,6 +366,10 @@ export async function handleNoteTextUpdate(
 Use bear-search-notes to find the correct note identifier.`);
     }
 
+    // Snapshot pre-write state for verification
+    const preWriteText = existingNote.text ?? '';
+    const preWriteTags = getNoteTags(id);
+
     // Strip markdown header syntax once — reused for both validation and Bear API
     const cleanHeader = header?.replace(/^#+\s*/, '');
 
@@ -217,24 +384,68 @@ Check the note content with bear-open-note to see available sections.`);
 
     // Bear's replace mode preserves the original heading (section header or note title),
     // so if the AI includes it in the replacement text, the result has a duplicate.
-    const cleanText =
+    let cleanText =
       mode === 'replace' ? stripLeadingHeader(text, cleanHeader || existingNote.title) : text;
+
+    // Determine the Bear API mode to use
+    let bearMode: 'append' | 'prepend' | 'replace' | 'replace_all' = mode;
+    let bearHeader: string | undefined = cleanHeader;
+
+    if (mode === 'replace') {
+      // H1 fix: Bear's mode=replace with H1 header appends instead of replacing.
+      // Detect this case and use splice + replace_all instead.
+      if (cleanHeader && existingNote.text) {
+        const h1Match = existingNote.text.match(/^(#)\s+(.+?)\s*$/m);
+        const isH1 = h1Match && h1Match[2].toLowerCase() === cleanHeader.toLowerCase();
+
+        if (isH1) {
+          logger.info('H1 header detected — using splice + replace_all path to avoid append bug');
+          const splicedBody = spliceSection(existingNote.text, cleanHeader, cleanText);
+          cleanText = appendTagsToBody(splicedBody, preWriteTags);
+          bearMode = 'replace_all';
+          bearHeader = undefined;
+        }
+      }
+
+      // Full-body replace: use replace_all with tag preservation
+      if (!header) {
+        cleanText = appendTagsToBody(cleanText, preWriteTags);
+        bearMode = 'replace_all';
+      }
+    }
 
     const url = buildBearUrl('add-text', {
       id,
       text: cleanText,
-      header: cleanHeader,
-      mode,
+      header: bearHeader,
+      mode: bearMode,
       // Ensures appended/prepended text starts on its own line, not glued to existing content.
-      // Not needed for replace — there's no preceding content to separate from.
+      // Not needed for replace modes — there's no preceding content to separate from.
       new_line: mode !== 'replace' ? 'yes' : undefined,
     });
     logger.debug(`Executing Bear URL: ${url}`);
     await executeBearXCallbackApi(url);
 
+    // Read-after-write verification — the core safety layer
+    const verification = await verifyNoteAfterWrite(id, preWriteText, preWriteTags);
+
+    if (!verification.success) {
+      const failureDetails = verification.failures.map((f) => `- ${f.message}`).join('\n');
+      logger.error(`Verification failed for note ${id}:\n${failureDetails}`);
+
+      return createToolResponse(`Write verification FAILED for note "${existingNote.title}".
+
+The operation was sent to Bear but verification detected problems:
+
+${failureDetails}
+
+Note ID: ${id}
+Use bear-open-note to inspect the current state of the note.`);
+    }
+
     const preposition = mode === 'replace' ? 'in' : 'to';
     const responseLines = [
-      `Text ${action} ${preposition} note "${existingNote.title}" successfully!`,
+      `Text ${action} ${preposition} note "${existingNote.title}" (verified).`,
       '',
     ];
 
@@ -246,16 +457,7 @@ Check the note content with bear-open-note to see available sections.`);
 
     responseLines.push(`Note ID: ${id}`);
 
-    const trailingMessage =
-      mode === 'replace'
-        ? cleanHeader
-          ? 'The section content has been replaced in your Bear note.'
-          : 'The note content has been replaced in your Bear note.'
-        : 'The text has been added to your Bear note.';
-
-    return createToolResponse(`${responseLines.join('\n')}
-
-${trailingMessage}`);
+    return createToolResponse(responseLines.join('\n'));
   } catch (error) {
     logger.error(`handleNoteTextUpdate(${mode}) failed: ${error}`);
     throw error;

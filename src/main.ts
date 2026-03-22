@@ -6,8 +6,21 @@ import { z } from 'zod';
 
 import { APP_VERSION, ENABLE_CONTENT_REPLACEMENT, ENABLE_NEW_NOTE_CONVENTIONS } from './config.js';
 import { applyNoteConventions } from './note-conventions.js';
-import { cleanBase64, createToolResponse, handleNoteTextUpdate, logger } from './utils.js';
-import { awaitNoteCreation, getNoteContent, searchNotes } from './notes.js';
+import {
+  appendTagsToBody,
+  cleanBase64,
+  createToolResponse,
+  handleNoteTextUpdate,
+  logger,
+  verifyNoteAfterWrite,
+} from './utils.js';
+import {
+  awaitNoteCreation,
+  getNoteContent,
+  getNoteRaw,
+  getNoteTags,
+  searchNotes,
+} from './notes.js';
 import { findUntaggedNotes, listTags } from './tags.js';
 import { buildBearUrl, executeBearXCallbackApi } from './bear-urls.js';
 import type { BearTag } from './types.js';
@@ -824,6 +837,205 @@ Tag: #${name}
 The tag has been removed from all notes. The notes themselves are not affected.`);
     } catch (error) {
       logger.error('bear-delete-tag failed:', error);
+      throw error;
+    }
+  }
+);
+
+server.registerTool(
+  'bear-upsert-note',
+  {
+    title: 'Create or Replace Note',
+    description:
+      'Create a new Bear note or replace an existing one entirely. If a note with the given ID exists (or a unique title match is found), replaces it with the provided content while preserving tags. If no match, creates a new note. Returns the note as it actually exists after the operation — not just "success".',
+    inputSchema: {
+      id: z
+        .string()
+        .trim()
+        .optional()
+        .describe('Note identifier — preferred when available. Use bear-search-notes to find it.'),
+      title: z
+        .string()
+        .trim()
+        .optional()
+        .describe(
+          'Note title for matching (used when ID is not available). If multiple notes share this title, the operation is refused with a list of matches.'
+        ),
+      text: z
+        .string()
+        .trim()
+        .min(1, 'Note content is required')
+        .describe('Full note content in markdown format, including H1 title and any frontmatter.'),
+      tags: z
+        .string()
+        .trim()
+        .optional()
+        .describe(
+          'Tags separated by commas, e.g., "chorus/questions,chorus". Applied on create; preserved automatically on replace.'
+        ),
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  async ({ id, title, text, tags }): Promise<CallToolResult> => {
+    logger.info(
+      `bear-upsert-note called with id: ${id || 'none'}, title: ${title ? '"' + title + '"' : 'none'}, text length: ${text.length}`
+    );
+
+    if (!id && !title) {
+      return createToolResponse(
+        'Either id or title is required. Use bear-search-notes to find the note, or provide a title for matching.'
+      );
+    }
+
+    try {
+      // Try to find existing note by ID first, then by title
+      let existingNote = id ? getNoteContent(id) : null;
+      let resolvedId = id;
+
+      if (!existingNote && title) {
+        const { notes } = searchNotes(title);
+        // Exact title matches only
+        const exactMatches = notes.filter((n) => n.title.toLowerCase() === title.toLowerCase());
+
+        if (exactMatches.length === 1) {
+          existingNote = getNoteContent(exactMatches[0].identifier);
+          resolvedId = exactMatches[0].identifier;
+        } else if (exactMatches.length > 1) {
+          const matchList = exactMatches
+            .map((n) => `- "${n.title}" (ID: ${n.identifier})`)
+            .join('\n');
+          return createToolResponse(
+            `Multiple notes match title "${title}". Specify by ID:\n\n${matchList}`
+          );
+        }
+      }
+
+      if (existingNote && resolvedId) {
+        // Replace existing note
+        const preWriteText = existingNote.text ?? '';
+        const preWriteTags = getNoteTags(resolvedId);
+
+        const bodyWithTags = appendTagsToBody(text, preWriteTags);
+
+        const url = buildBearUrl('add-text', {
+          id: resolvedId,
+          text: bodyWithTags,
+          mode: 'replace_all',
+        });
+
+        await executeBearXCallbackApi(url);
+
+        const verification = await verifyNoteAfterWrite(resolvedId, preWriteText, preWriteTags);
+
+        if (!verification.success) {
+          const failureDetails = verification.failures.map((f) => `- ${f.message}`).join('\n');
+          return createToolResponse(
+            `Upsert verification FAILED for note "${existingNote.title}".\n\n${failureDetails}\n\nNote ID: ${resolvedId}\nUse bear-open-note to inspect the current state.`
+          );
+        }
+
+        // Return the actual note content post-write
+        const updatedNote = getNoteContent(resolvedId);
+        const noteBody = updatedNote?.text ?? '*Could not read note back*';
+
+        return createToolResponse(
+          `Note replaced and verified.\n\nNote ID: ${resolvedId}\nTitle: "${updatedNote?.title}"\n\n---\n\n${noteBody}`
+        );
+      } else {
+        // Create new note
+        const { text: createText, tags: createTags } = ENABLE_NEW_NOTE_CONVENTIONS
+          ? applyNoteConventions({ text, tags })
+          : { text, tags };
+
+        const url = buildBearUrl('create', { text: createText, tags: createTags });
+        await executeBearXCallbackApi(url);
+
+        // Extract title from H1 in body for creation polling
+        const h1Match = text.match(/^#\s+(.+)$/m);
+        const noteTitle = title || h1Match?.[1];
+        const createdId = noteTitle ? await awaitNoteCreation(noteTitle) : undefined;
+
+        if (createdId) {
+          const createdNote = getNoteContent(createdId);
+          const noteBody = createdNote?.text ?? '*Could not read note back*';
+          return createToolResponse(
+            `Note created and verified.\n\nNote ID: ${createdId}\nTitle: "${createdNote?.title}"\n\n---\n\n${noteBody}`
+          );
+        }
+
+        return createToolResponse(
+          'Note created, but could not retrieve its ID for verification. Use bear-search-notes to find it.'
+        );
+      }
+    } catch (error) {
+      logger.error('bear-upsert-note failed:', error);
+      throw error;
+    }
+  }
+);
+
+server.registerTool(
+  'bear-trash-note',
+  {
+    title: 'Trash Bear Note',
+    description:
+      "Move a note to Bear's trash. Unlike archive, trashed notes are eventually deleted. Verifies the note was actually trashed via database check. Use bear-search-notes first to get the note ID.",
+    inputSchema: {
+      id: z
+        .string()
+        .trim()
+        .min(1, 'Note ID is required')
+        .describe('Note identifier (ID) from bear-search-notes or bear-open-note'),
+    },
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
+  },
+  async ({ id }): Promise<CallToolResult> => {
+    logger.info(`bear-trash-note called with id: ${id}`);
+
+    try {
+      const existingNote = getNoteContent(id);
+      if (!existingNote) {
+        return createToolResponse(
+          `Note with ID '${id}' not found. The note may have been deleted, archived, or the ID may be incorrect.\n\nUse bear-search-notes to find the correct note identifier.`
+        );
+      }
+
+      const url = buildBearUrl('trash', {
+        id,
+        show_window: 'no',
+      });
+
+      await executeBearXCallbackApi(url);
+
+      // Verify the note is actually trashed via SQLite
+      const { setTimeout: wait } = await import('node:timers/promises');
+      const deadline = Date.now() + 2_000;
+
+      while (Date.now() < deadline) {
+        const raw = getNoteRaw(id);
+        if (raw?.trashed) {
+          return createToolResponse(
+            `Note trashed and verified.\n\nNote: "${existingNote.title}"\nID: ${id}`
+          );
+        }
+        await wait(25);
+      }
+
+      return createToolResponse(
+        `Trash command sent but verification failed — note "${existingNote.title}" may not be trashed.\n\nID: ${id}\nCheck Bear manually.`
+      );
+    } catch (error) {
+      logger.error('bear-trash-note failed:', error);
       throw error;
     }
   }
