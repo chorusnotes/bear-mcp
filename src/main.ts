@@ -33,7 +33,7 @@ import type { BearTag } from './types.js';
 
 const server = new McpServer(
   {
-    name: 'bear-notes-mcp',
+    name: 'bear-notes-chorus',
     version: APP_VERSION,
   },
   {
@@ -257,7 +257,7 @@ server.registerTool(
     pinned,
   }): Promise<CallToolResult> => {
     logger.info(
-      `bear-search-notes called with term: "${term || 'none'}", tag: "${tag || 'none'}", limit: ${limit || 'default'}, createdAfter: "${createdAfter || 'none'}", createdBefore: "${createdBefore || 'none'}", modifiedAfter: "${modifiedAfter || 'none'}", modifiedBefore: "${modifiedBefore || 'none'}", pinned: ${pinned ?? 'none'}, includeFiles: always`
+      `bear-search-notes called with hasTerm: ${!!term}, hasTag: ${!!tag}, limit: ${limit || 'default'}, pinned: ${pinned ?? 'none'}`
     );
 
     try {
@@ -464,7 +464,7 @@ server.registerTool(
   },
   async ({ base64_content, filename, id, title }): Promise<CallToolResult> => {
     logger.info(
-      `bear-add-file called with base64_content: ${base64_content ? 'provided' : 'none'}, filename: ${filename || 'none'}, id: ${id || 'none'}, title: ${title || 'none'}`
+      `bear-add-file called with hasPayload: ${!!base64_content}, hasId: ${!!id}, hasTitle: ${!!title}`
     );
 
     if (!id && !title) {
@@ -693,7 +693,7 @@ server.registerTool(
     },
   },
   async ({ id, tags }): Promise<CallToolResult> => {
-    logger.info(`bear-add-tag called with id: ${id}, tags: [${tags.join(', ')}]`);
+    logger.info(`bear-add-tag called with id: ${id}, tag count: ${tags.length}`);
 
     try {
       const existingNote = getNoteContent(id);
@@ -850,7 +850,7 @@ server.registerTool(
     },
   },
   async ({ name, new_name }): Promise<CallToolResult> => {
-    logger.info(`bear-rename-tag called with name: "${name}", new_name: "${new_name}"`);
+    logger.info('bear-rename-tag called');
 
     try {
       const url = buildBearUrl('rename-tag', {
@@ -905,7 +905,7 @@ server.registerTool(
     },
   },
   async ({ name }): Promise<CallToolResult> => {
-    logger.info(`bear-delete-tag called with name: "${name}"`);
+    logger.info('bear-delete-tag called');
 
     try {
       const url = buildBearUrl('delete-tag', {
@@ -978,7 +978,7 @@ server.registerTool(
   },
   async ({ id, title, text, tags }): Promise<CallToolResult> => {
     logger.info(
-      `bear-upsert-note called with id: ${id || 'none'}, title: ${title ? '"' + title + '"' : 'none'}, text length: ${text.length}`
+      `bear-upsert-note called with hasId: ${!!id}, hasTitle: ${!!title}, textLength: ${text.length}`
     );
 
     if (!id && !title) {

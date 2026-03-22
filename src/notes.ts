@@ -135,7 +135,7 @@ export function getNoteContent(identifier: string): BearNote | null {
     }
 
     logger.info(
-      `Retrieved note content with ${files.length} attached files for: ${formattedNote.title}`
+      `Retrieved note content with ${files.length} attached files for id: ${formattedNote.identifier}`
     );
     return formattedNote;
   } catch (error) {
@@ -169,15 +169,15 @@ export function searchNotes(
   dateFilter?: DateFilter,
   pinned?: boolean
 ): { notes: BearNote[]; totalCount: number } {
-  logger.info(
-    `searchNotes called with term: "${searchTerm || 'none'}", tag: "${tag || 'none'}", limit: ${limit || DEFAULT_SEARCH_LIMIT}, dateFilter: ${dateFilter ? JSON.stringify(dateFilter) : 'none'}, pinned: ${pinned ?? 'none'}, includeFiles: always`
-  );
-
   // Validate search parameters - at least one must be provided
   const hasSearchTerm = searchTerm && typeof searchTerm === 'string' && searchTerm.trim();
   const hasTag = tag && typeof tag === 'string' && tag.trim();
   const hasDateFilter = dateFilter && Object.keys(dateFilter).length > 0;
   const hasPinnedFilter = pinned === true;
+
+  logger.info(
+    `searchNotes called with hasTerm: ${!!hasSearchTerm}, hasTag: ${!!hasTag}, limit: ${limit || DEFAULT_SEARCH_LIMIT}, hasDateFilter: ${!!hasDateFilter}, pinned: ${pinned ?? 'none'}`
+  );
 
   if (!hasSearchTerm && !hasTag && !hasDateFilter && !hasPinnedFilter) {
     logAndThrow(
@@ -490,7 +490,7 @@ export async function awaitNoteCreation(title: string): Promise<string | null> {
       await setTimeout(POLL_INTERVAL_MS);
     }
 
-    logger.info(`awaitNoteCreation: timed out waiting for note "${title}"`);
+    logger.info('awaitNoteCreation: timed out');
     return null;
   } catch (error) {
     // Intentionally not using logAndThrow — the note was already created via URL API,

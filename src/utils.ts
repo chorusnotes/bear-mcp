@@ -378,7 +378,7 @@ export async function handleNoteTextUpdate(
 ): Promise<CallToolResult> {
   const action = mode === 'append' ? 'appended' : mode === 'prepend' ? 'prepended' : 'replaced';
   logger.info(
-    `handleNoteTextUpdate(${mode}) id: ${id}, text length: ${text.length}, header: ${header || 'none'}`
+    `handleNoteTextUpdate(${mode}) id: ${id}, textLength: ${text.length}, hasHeader: ${!!header}`
   );
 
   try {
