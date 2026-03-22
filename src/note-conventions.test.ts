@@ -1,111 +1,150 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyNoteConventions } from './note-conventions.js';
+import { validateChorusStructure } from './note-conventions.js';
 
-describe('applyNoteConventions', () => {
-  describe('pass-through when no tags provided', () => {
-    it('undefined tags returns text unchanged', () => {
-      const result = applyNoteConventions({ text: 'hello', tags: undefined });
+const validNote = [
+  '---',
+  'type: question',
+  'summary: What is gravity?',
+  'tags: [chorus/questions, chorus]',
+  '---',
+  '# What is gravity?',
+  '',
+  'Body content here.',
+  '',
+  '#chorus/questions #chorus',
+].join('\n');
 
-      expect(result).toEqual({ text: 'hello', tags: undefined });
-    });
+describe('validateChorusStructure', () => {
+  it('accepts a valid Chorus note (all 4 rules pass)', () => {
+    const result = validateChorusStructure(validNote);
 
-    it('empty string tags returns text unchanged', () => {
-      const result = applyNoteConventions({ text: 'hello', tags: '' });
-
-      expect(result).toEqual({ text: 'hello', tags: undefined });
-    });
-
-    it('both text and tags undefined returns both unchanged', () => {
-      const result = applyNoteConventions({ text: undefined, tags: undefined });
-
-      expect(result).toEqual({ text: undefined, tags: undefined });
-    });
+    expect(result.valid).toBe(true);
+    expect(result.violations).toEqual([]);
   });
 
-  describe('tags only, no text', () => {
-    it('multiple tags produce tag line without separator', () => {
-      const result = applyNoteConventions({ text: undefined, tags: 'work,urgent' });
+  it('rejects note without YAML frontmatter', () => {
+    const note = '# Title\n\nSome body text.\n\n#chorus';
+    const result = validateChorusStructure(note);
 
-      expect(result).toEqual({ text: '#work #urgent', tags: undefined });
-    });
-
-    it('empty string text treated as no text', () => {
-      const result = applyNoteConventions({ text: '', tags: 'work' });
-
-      expect(result).toEqual({ text: '#work', tags: undefined });
-    });
+    expect(result.valid).toBe(false);
+    expect(result.violations).toContainEqual(
+      expect.objectContaining({ rule: 'missing_yaml' })
+    );
   });
 
-  describe('tags + text composition', () => {
-    it('multiple tags and text joined with separator', () => {
-      const result = applyNoteConventions({ text: 'body', tags: 'work,urgent' });
+  it('rejects note with wrong YAML field order (summary before type)', () => {
+    const note = [
+      '---',
+      'summary: What is gravity?',
+      'type: question',
+      'tags: [chorus]',
+      '---',
+      '# What is gravity?',
+      '',
+      '#chorus',
+    ].join('\n');
 
-      expect(result).toEqual({ text: '#work #urgent\n---\nbody', tags: undefined });
-    });
+    const result = validateChorusStructure(note);
 
-    it('single tag and text joined with separator', () => {
-      const result = applyNoteConventions({ text: 'body', tags: 'work' });
-
-      expect(result).toEqual({ text: '#work\n---\nbody', tags: undefined });
-    });
+    expect(result.valid).toBe(false);
+    expect(result.violations).toContainEqual(
+      expect.objectContaining({ rule: 'yaml_field_order' })
+    );
   });
 
-  describe('closing hash rules', () => {
-    it('nested tag without spaces has no closing hash', () => {
-      const result = applyNoteConventions({ text: undefined, tags: 'work/meetings' });
+  it('rejects note without H1 after YAML', () => {
+    const note = [
+      '---',
+      'type: question',
+      'summary: What is gravity?',
+      'tags: [chorus]',
+      '---',
+      'Just a paragraph, no heading.',
+      '',
+      '#chorus',
+    ].join('\n');
 
-      expect(result).toEqual({ text: '#work/meetings', tags: undefined });
-    });
+    const result = validateChorusStructure(note);
 
-    it('tag with space gets closing hash', () => {
-      const result = applyNoteConventions({ text: undefined, tags: 'my tag' });
-
-      expect(result).toEqual({ text: '#my tag#', tags: undefined });
-    });
-
-    it('nested tag with spaces gets closing hash', () => {
-      const result = applyNoteConventions({ text: undefined, tags: 'work/meeting notes' });
-
-      expect(result).toEqual({ text: '#work/meeting notes#', tags: undefined });
-    });
-
-    it('simple tag has no closing hash', () => {
-      const result = applyNoteConventions({ text: undefined, tags: 'urgent' });
-
-      expect(result).toEqual({ text: '#urgent', tags: undefined });
-    });
-
-    it('mixed tags apply closing hash per-tag', () => {
-      const result = applyNoteConventions({ text: undefined, tags: 'work/meetings,urgent,my tag' });
-
-      expect(result).toEqual({ text: '#work/meetings #urgent #my tag#', tags: undefined });
-    });
+    expect(result.valid).toBe(false);
+    expect(result.violations).toContainEqual(
+      expect.objectContaining({ rule: 'missing_h1' })
+    );
   });
 
-  describe('tag cleanup edge cases', () => {
-    it('strips leading and trailing hash symbols from tags', () => {
-      const result = applyNoteConventions({ text: undefined, tags: '#work,##urgent#' });
+  it('rejects note where YAML tags do not mirror inline tags', () => {
+    const note = [
+      '---',
+      'type: question',
+      'summary: What is gravity?',
+      'tags: [chorus/questions, chorus]',
+      '---',
+      '# What is gravity?',
+      '',
+      'Body content here.',
+      '',
+      '#chorus',
+    ].join('\n');
 
-      expect(result).toEqual({ text: '#work #urgent', tags: undefined });
-    });
+    const result = validateChorusStructure(note);
 
-    it('all-invalid tags pass text through unchanged', () => {
-      const result = applyNoteConventions({ text: 'hello', tags: '###,,,  ' });
+    expect(result.valid).toBe(false);
+    expect(result.violations).toContainEqual(
+      expect.objectContaining({ rule: 'tags_not_mirrored' })
+    );
+  });
 
-      expect(result).toEqual({ text: 'hello', tags: undefined });
-    });
+  it('accepts multi-word tags with closing hash (#my tag#)', () => {
+    const note = [
+      '---',
+      'type: question',
+      'summary: What is gravity?',
+      'tags: [my tag, chorus]',
+      '---',
+      '# What is gravity?',
+      '',
+      'Body content here.',
+      '',
+      '#my tag# #chorus',
+    ].join('\n');
 
-    it('empty segments between commas are filtered out', () => {
-      const result = applyNoteConventions({ text: undefined, tags: 'work, , ,urgent' });
+    const result = validateChorusStructure(note);
 
-      expect(result).toEqual({ text: '#work #urgent', tags: undefined });
-    });
+    expect(result.valid).toBe(true);
+    expect(result.violations).toEqual([]);
+  });
 
-    it('whitespace around tags is trimmed', () => {
-      const result = applyNoteConventions({ text: undefined, tags: ' work , urgent ' });
+  it('collects multiple violations at once', () => {
+    const note = 'Just plain text, nothing structured.';
+    const result = validateChorusStructure(note);
 
-      expect(result).toEqual({ text: '#work #urgent', tags: undefined });
-    });
+    expect(result.valid).toBe(false);
+    // At minimum, missing_yaml — other rules only fire when YAML is present
+    expect(result.violations.length).toBeGreaterThanOrEqual(1);
+    expect(result.violations).toContainEqual(
+      expect.objectContaining({ rule: 'missing_yaml' })
+    );
+  });
+
+  it('collects field order + missing H1 + tag mismatch together', () => {
+    const note = [
+      '---',
+      'summary: What is gravity?',
+      'type: question',
+      'tags: [chorus/questions, chorus]',
+      '---',
+      'No heading here.',
+      '',
+      '#chorus',
+    ].join('\n');
+
+    const result = validateChorusStructure(note);
+
+    expect(result.valid).toBe(false);
+    const rules = result.violations.map((v) => v.rule);
+    expect(rules).toContain('yaml_field_order');
+    expect(rules).toContain('missing_h1');
+    expect(rules).toContain('tags_not_mirrored');
   });
 });
