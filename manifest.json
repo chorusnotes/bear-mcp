@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "bear-notes-chorus",
   "display_name": "Bear Notes Chorus",
-  "version": "3.1.0",
+  "version": "26.03.23",
   "icon": "icon.png",
   "screenshots": ["screenshots/search-demo.png"],
   "description": "Bear Notes MCP fork for Chorus workflows, with note conventions, tag preservation, and upsert support.",
