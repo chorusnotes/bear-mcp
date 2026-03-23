@@ -40,8 +40,10 @@ tasks:
       - npm run build
       
   test:system:
-    if: '{{ ne .CI "true" }}' # Skip in CI as there is no system test environment set up yet
     desc: Run system tests with MCP Inspector CLI
+    # Skip in CI / container — system tests need Bear.app on macOS
+    status:
+      - test "$CI" = "true"
     cmds:
       - npm run test:system
 
