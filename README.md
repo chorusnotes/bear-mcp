@@ -2,16 +2,18 @@
 
 A hardened [MCP server](https://modelcontextprotocol.io/) for [Bear Notes](https://bear.app) with write verification, structural conventions, and tag management. Part of [Chorus Notes](https://github.com/chorusnotes).
 
-Fork of [vasylenko/claude-desktop-extension-bear-notes](https://github.com/vasylenko/claude-desktop-extension-bear-notes).
+## Why this exists
 
-## What this fork changes
+Bear's x-callback-url API has no write confirmation. You send a command, Bear says nothing back. Every MCP server built on this API — including the one this project grew from — reports success whether the write landed or not. That means silent failures: doubled content, lost tags, appended-instead-of-replaced text, all reported as "success."
 
-The upstream MCP server reports success on every write regardless of outcome. This fork verifies writes by reading back from Bear's database after each operation and checking for common failure modes: unchanged text, doubled content, and lost tags. When something goes wrong, it says so.
+bear-mcp reads back from Bear's database after every mutating operation and checks for common failure modes. When something goes wrong, it says so.
 
-**Write safety:**
+## What it does
+
+**Write verification:**
 - Post-write read-back checks on all mutating operations
 - Tag preservation across full-body replacements
-- H1 section replace via splice (fixes upstream's append-instead-of-replace bug)
+- Section replace via splice (prevents append-instead-of-replace failures)
 - Sub-section preservation on parent header replacement
 - Ambiguity refusal on title-based lookups (multiple matches → error, not silent pick)
 
@@ -20,11 +22,20 @@ The upstream MCP server reports success on every write regardless of outcome. Th
 - Validation on create and upsert-replace rejects malformed notes before writing
 - Can be disabled for general Bear use without Chorus structure
 
-**Additional tools:**
+**Tools:**
+- `bear-open-note` — read full content including OCR from attachments
+- `bear-create-note` — create with optional title, content, and tags
+- `bear-search-notes` — find by text, tags, or date ranges
+- `bear-add-text` — insert at beginning, end, or within a section
+- `bear-replace-text` — replace full body or a specific section
 - `bear-upsert-note` — create or replace by ID or unique title match
-- `bear-trash-note` — move to trash with database verification
-- `bear-get-tags` — lightweight tag list without loading full note body
+- `bear-add-file` — attach files via base64
+- `bear-add-tag` — add tags with deduplication
+- `bear-get-tags` — lightweight tag list without loading full body
 - `bear-find-untagged-notes` — find notes missing tags
+- `bear-list-tags` — hierarchical tag tree
+- `bear-rename-tag` / `bear-delete-tag` — tag management
+- `bear-archive-note` / `bear-trash-note` — with database verification
 
 
 ## Requirements
@@ -58,17 +69,19 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 
 ## Known limitations
 
-- Bear's x-callback-url API has no write confirmation mechanism. Verification uses post-write database polling, which catches most failures but cannot guarantee exact intended post-state. The response language reflects this — "write confirmed" means "checked and no obvious problems found," not "mathematically proven correct."
-- Archived notes cannot be trashed directly (Bear's internal filter, not a fork bug).
-- Attachment rendering after trailing tags is Bear's formatting, not fork-controlled.
+- Verification uses post-write database polling, which catches most failures but cannot guarantee exact intended post-state. Response language reflects this — "write confirmed" means "checked and no obvious problems found," not "mathematically proven correct."
+- Archived notes cannot be trashed directly (Bear's internal filter).
+- Attachment rendering after trailing tags is Bear's formatting.
 - The Bear database path is hardcoded to the default iCloud location.
 
 ## Status
 
-v3.1.0 — actively developed. See the [Chorus Notes org](https://github.com/chorusnotes) for project context.
+`26.03.23` — actively developed. See the [Chorus Notes org](https://github.com/chorusnotes) for project context.
 
 ## License
 
 MIT. See [LICENSE.md](LICENSE.md).
 
-Original work by [Serhii Vasylenko](https://github.com/vasylenko). Fork maintained by [N8K](https://github.com/heyn8k).
+## Acknowledgments
+
+bear-mcp builds on the original Bear Notes MCP server by [Serhii Vasylenko](https://github.com/vasylenko) ([claude-desktop-extension-bear-notes](https://github.com/vasylenko/claude-desktop-extension-bear-notes)). His work provided the foundation — the x-callback-url integration, database reading, and tool structure that made everything else possible.
