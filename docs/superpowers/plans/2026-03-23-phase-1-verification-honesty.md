@@ -4,7 +4,7 @@
 
 **Goal:** Make the bear-mcp verification layer honest — no tool overstates certainty — and, where empirically supported, upgrade it to expected-vs-actual content comparison.
 
-**Architecture:** Two parallel tracks. Track 1 (Tasks 1–5) ships unconditionally: relabel all response strings to a three-tier model, fix stale tests, correct documentation. Track 2 (Tasks 6–9) is gated on empirical testing of Bear's normalization behavior: if Bear preserves text exactly, upgrade verification to full content comparison.
+**Architecture:** Two tracks with a human checkpoint between them. Track 1 (Tasks 1–5) is the releasable milestone: relabel all response strings, fix stale tests, correct documentation. Track 1 alone earns a version bump and release. Track 2 (Tasks 6–9) is gated on both empirical testing and a human decision after living with Track 1's labels in real usage. Track 2 is follow-on work, not a blocker for Phase 1 completion.
 
 **Tech Stack:** TypeScript, Node.js 24, `node:sqlite`, vitest (unit), custom system tests against live Bear
 
@@ -23,8 +23,9 @@
 - `README.md` — overclaim language
 - `manifest.json` — overclaim in tool descriptions
 
-**Modified files (Track 2, conditional):**
+**Modified files (Track 2, conditional — requires human checkpoint after Track 1):**
 - `src/utils.ts` — `computeExpectedBody` function, `verifyNoteAfterWrite` upgrade
+- `src/types.ts` — `VerificationResult` type (add `contentMatched` field)
 - `src/main.ts` — pass expected body at call sites
 
 **New files (Track 2):**
@@ -278,34 +279,12 @@ with:
         `Note trash (dispatched, unverified) — could not confirm note "${existingNote.title}" was trashed.\n\nID: ${id}\nCheck Bear manually.`
 ```
 
-- [ ] **Step 9: Update failure strings — keep "FAILED" but remove "verification"**
+- [ ] **Step 9: Keep failure strings — retain "verification" wording**
 
-In `src/utils.ts:453`, replace:
-```typescript
-      return createToolResponse(`Write verification FAILED for note "${existingNote.title}".
-```
-with:
-```typescript
-      return createToolResponse(`Write FAILED for note "${existingNote.title}".
-```
-
-In `src/main.ts:749`, replace:
-```typescript
-          `Tag add verification FAILED for note "${existingNote.title}".\n\n${failureDetails}\n\nNote ID: ${id}`
-```
-with:
-```typescript
-          `Tag add FAILED for note "${existingNote.title}".\n\n${failureDetails}\n\nNote ID: ${id}`
-```
-
-In `src/main.ts:1052`, replace:
-```typescript
-            `Upsert verification FAILED for note "${existingNote.title}".\n\n${failureDetails}\n\nNote ID: ${resolvedId}\nUse bear-open-note to inspect the current state.`
-```
-with:
-```typescript
-            `Upsert FAILED for note "${existingNote.title}".\n\n${failureDetails}\n\nNote ID: ${resolvedId}\nUse bear-open-note to inspect the current state.`
-```
+Failure strings keep "verification" because the write may have been dispatched successfully while the post-write checks failed. "Write verification FAILED" is more precise than "Write FAILED" — it tells the user the write was sent but the verification layer detected problems. No changes to:
+- `src/utils.ts:453` — `Write verification FAILED` (keep as-is)
+- `src/main.ts:749` — `Tag add verification FAILED` (keep as-is)
+- `src/main.ts:1052` — `Upsert verification FAILED` (keep as-is)
 
 - [ ] **Step 10: Add tier labels to no-op success paths**
 
@@ -327,10 +306,10 @@ with:
             `Note already matches the provided content (state confirmed).\n\nNote ID: ${resolvedId}\nTitle: "${existingNote.title}"`
 ```
 
-- [ ] **Step 11: Grep for any remaining "verified" in response strings**
+- [ ] **Step 11: Grep for any remaining "(verified)" in response strings**
 
-Run: `grep -n 'verified\|Verified\|VERIFIED' src/main.ts src/utils.ts | grep -v '^\s*//' | grep -v 'import'`
-Expected: No matches in response strings. (Comments and variable names like `verification` are acceptable.)
+Run: `grep -n '(verified)' src/main.ts src/utils.ts`
+Expected: Zero matches. This pattern targets the exact parenthesized label, avoiding false positives from "unverified", "verification", or variable names.
 
 - [ ] **Step 12: Run unit tests**
 
@@ -346,26 +325,31 @@ git commit -m "refactor: relabel fallback, failure, and no-op response strings t
 
 ---
 
-### Task 4: Inventory and fix stale system test assertions
+### Task 4: Fix stale system test assertions and record baseline
+
+**Prerequisites:** Bear.app must be running on the host. System tests use the MCP Inspector CLI to send tool calls to a live Bear instance. Verify Bear is running before proceeding.
 
 **Files:**
 - Modify: `tests/system/tag-management.test.ts:50,94,141,180`
-- Potentially modify: other `tests/system/*.test.ts` files
 
-- [ ] **Step 1: Run system tests and inventory failures**
+**Scope:** This task fixes only the 4 known stale string assertions in `tag-management.test.ts`. The current system test baseline is 32 passing / 9 failing. Of the 9 failures:
+- **4 are stale string assertions** (this task): `tag-management.test.ts:50,94,141,180`
+- **5 are pre-existing behavioral failures** (out of scope): `replace-text.test.ts:52,421`, `note-conventions.test.ts:78,109`, `attached-files.test.ts:193`
 
-Run: `npm run test:system 2>&1 | tail -60`
-Record the exact count and location of every failing assertion. Do not assume "9" — count the real number.
+The 5 behavioral failures are pre-existing and unrelated to Phase 1. They must not be confused with regressions from verification-honesty changes. After this task, the expected baseline is 36 passing / 5 failing.
 
-- [ ] **Step 2: Categorize each failure**
+- [ ] **Step 1: Run system tests and record current baseline**
 
-For each failure, determine:
-- Is it a pure string assertion mismatch? (Fix in this task)
-- Does it test verification behavior? (Separate task if any)
+Run: `npx vitest run --config vitest.system.config.ts 2>&1 | tee /tmp/system-test-baseline.txt`
+Confirm 32 passing / 9 failing. Record this as the pre-Phase-1 baseline.
+
+- [ ] **Step 2: Verify the 4 stale assertions are string mismatches**
+
+Confirm these 4 fail because the test expects old wording ("renamed successfully", "deleted successfully") while the code now emits "(state confirmed)". Not behavioral changes.
 
 - [ ] **Step 3: Fix tag-management.test.ts assertions**
 
-These are known stale assertions. Update to use substring matching for tier labels:
+Update to use substring matching for tier labels:
 
 In `tests/system/tag-management.test.ts:50`, replace:
 ```typescript
@@ -407,20 +391,19 @@ with:
     expect(result).toContain('deleted');
 ```
 
-- [ ] **Step 4: Fix any other stale assertions found in Step 1**
+- [ ] **Step 4: Run system tests and confirm improvement**
 
-Update each using the same substring/semantic pattern: assert operation outcome + tier label presence.
+Run: `npx vitest run --config vitest.system.config.ts`
+Expected: 36 passing / 5 failing (4 fewer failures than baseline). The 5 remaining failures are pre-existing behavioral issues — not regressions. Confirm no new failures were introduced.
 
-- [ ] **Step 5: Run system tests**
-
-Run: `npm run test:system`
-Expected: All tests pass (this requires Bear.app running on host)
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add tests/system/
-git commit -m "test: update system test assertions to three-tier response model"
+git commit -m "test: update 4 stale tag-management assertions to three-tier response model
+
+Baseline moves from 32/41 to 36/41. Remaining 5 failures are
+pre-existing behavioral issues unrelated to Phase 1."
 ```
 
 ---
@@ -471,12 +454,13 @@ In `README.md`, the opening line says "with write verification" and the "Write v
 with:
 
 ```markdown
-**Write verification (three-tier certainty model):**
+**Write verification (certainty model):**
 - Post-write read-back checks on all mutating operations with explicit certainty labeling:
-  - *content matched* — expected body equals actual persisted body
-  - *state confirmed* — database state change confirmed (flag, tag, row)
-  - *dispatched, unverified* — request sent, no post-state confirmation
+  - *state confirmed* — database state change confirmed (flag, tag, heuristic checks passed)
+  - *dispatched, unverified* — request sent, no post-state confirmation possible
 ```
+
+Note: Do NOT document "content matched" in Track 1. The code cannot currently emit it — `VerificationResult` has no `contentMatched` field and `verifyNoteAfterWrite` is heuristic-only. Only document tiers the current build can truthfully emit. Add "content matched" to the README when Track 2 ships.
 
 - [ ] **Step 4: Fix manifest.json overclaim language**
 
@@ -518,27 +502,41 @@ with:
       "Move a note to Bear's trash. Unlike archive, trashed notes are eventually deleted. Confirms the trash state via database check. Use bear-search-notes first to get the note ID.",
 ```
 
-- [ ] **Step 6: Scan for any remaining overclaim language**
+- [ ] **Step 6: Manual review of bear-create-note description**
 
-Run: `grep -rn 'verified\|Verifies\|verification' README.md manifest.json .claude/contexts/SPECIFICATION.md src/main.ts | grep -v node_modules | grep -v '^\s*//'`
+Priority manual check: `bear-create-note`'s description (`src/main.ts:128-129`) says "Returns the note ID when a title is provided, enabling immediate follow-up operations." This is an overclaim — `awaitNoteCreation()` can time out and the handler already has an unverified fallback path (`src/main.ts:186`). Update the description to say "Returns the note ID when a title is provided and the note is confirmed in the database" or similar language that acknowledges the fallback.
 
-Review each match. Variable names (`verification`, `verifyNoteAfterWrite`) are fine. User-facing text claiming "verified" or "Verifies" should be fixed.
+Also manually review all other write-tool descriptions (the grep in Step 7 won't catch overclaims that don't use the word "verified").
 
-- [ ] **Step 7: Run unit tests**
+- [ ] **Step 7: Scan for any remaining overclaim language**
+
+Run: `grep -rn '(verified)\|Verifies\b' README.md manifest.json .claude/contexts/SPECIFICATION.md src/main.ts | grep -v node_modules`
+
+Review each match. Variable names and function names (`verification`, `verifyNoteAfterWrite`) are fine. User-facing text using "(verified)" or "Verifies" should be fixed. Also check `.claude/contexts/` files beyond SPECIFICATION.md.
+
+- [ ] **Step 8: Run unit tests**
 
 Run: `npm test`
 Expected: All 53 pass
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add .claude/contexts/SPECIFICATION.md README.md manifest.json src/main.ts
-git commit -m "docs: correct overclaim surfaces — three-tier verification model, accurate API description"
+git commit -m "docs: correct overclaim surfaces — verification certainty model, accurate API description"
 ```
 
 ---
 
-## Track 2: Verification Upgrade
+## Human Checkpoint
+
+**After Track 1 ships:** Use the tools in a real session. See the new labels in Claude Desktop. Confirm they read well at the speed of actual work. Then decide if Track 2's investment is worth it. Track 1 alone earns a version bump and release — do not hold the version for Track 2.
+
+**Time-box Track 2:** If the normalization harness and test run take more than one session, reassess. The features in Phase 2 (OCR toggle, structured reading, diff tool) may deliver more daily value than a verification upgrade for failure modes not yet encountered in field use.
+
+---
+
+## Track 2: Verification Upgrade (follow-on, requires human checkpoint)
 
 ### Task 6: Commit normalization acceptance criteria
 
@@ -606,7 +604,7 @@ Create `tests/system/normalization.test.ts` with:
 
 - [ ] **Step 2: Run the normalization test**
 
-Run: `npm run test:system -- --testPathPattern normalization`
+Run: `npx vitest run --config vitest.system.config.ts tests/system/normalization.test.ts`
 Record all results. For any mismatches, document exactly what changed.
 
 - [ ] **Step 3: Classify result as clean/predictable/unpredictable**
@@ -638,7 +636,8 @@ git commit -m "test: empirical Bear normalization test — [RESULT: clean/predic
 
 **Files:**
 - Modify: `src/utils.ts` — add `computeExpectedBody`, upgrade `verifyNoteAfterWrite`
-- Modify: `src/main.ts` — pass expected body at call sites
+- Modify: `src/types.ts` — add `contentMatched` field to `VerificationResult`
+- Modify: `src/main.ts` — pass expected body at call sites, read `contentMatched` for tier selection
 - Create: `src/utils.test.ts` additions for `computeExpectedBody`
 
 - [ ] **Step 1: Write failing tests for computeExpectedBody**
@@ -730,14 +729,21 @@ git commit -m "docs: document Bear normalization findings — content comparison
 
 ---
 
-## Verification Checklist
+## Track 1 Release Gate
 
-After all tasks complete, verify these success criteria:
+After Tasks 1–5 complete, verify these criteria for release:
 
-- [ ] `npm test` — all unit tests pass
-- [ ] `npm run test:system` — all system tests pass
-- [ ] `grep -rn 'verified' src/main.ts src/utils.ts` — no "(verified)" in response strings (variable names OK)
-- [ ] Every write-tool success path emits one of: "content matched", "state confirmed", "dispatched, unverified"
-- [ ] Every failure path remains an explicit failure with diagnostics
-- [ ] README, manifest.json, SPECIFICATION.md, tool descriptions — no overclaims
-- [ ] Normalization findings committed regardless of outcome
+- [ ] `npm test` — all 53 unit tests pass
+- [ ] `npx vitest run --config vitest.system.config.ts` — 36 passing / 5 failing (the 4 stale assertions fixed, 5 pre-existing behavioral failures preserved, zero new failures introduced)
+- [ ] `grep -n '(verified)' src/main.ts src/utils.ts` — zero matches
+- [ ] Every write-tool success path emits one of: "state confirmed" or "dispatched, unverified"
+- [ ] Every write-tool failure path retains "verification FAILED" with diagnostics
+- [ ] README, manifest.json, SPECIFICATION.md, tool descriptions — no overclaims beyond what the code delivers
+- [ ] Verification matrix in SPECIFICATION.md matches actual code behavior
+
+## Track 2 Closure Gate (after human checkpoint)
+
+- [ ] Normalization acceptance criteria committed before testing
+- [ ] Normalization findings documented and committed regardless of outcome
+- [ ] If clean/predictable: qualifying paths upgraded to "content matched", README updated
+- [ ] If unpredictable: documented in spec, text writes remain "state confirmed"
