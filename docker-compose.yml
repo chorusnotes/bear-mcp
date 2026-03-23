@@ -1,0 +1,21 @@
+services:
+  dev:
+    build: .
+    volumes:
+      # Source — live editing from host
+      - .:/workspace
+      # Container-native node_modules (Linux binaries, isolated from host)
+      - node_modules:/workspace/node_modules
+      # Bear database — read-only for container-side DB queries
+      - "${HOME}/Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data:/bear/data:ro"
+    environment:
+      - BEAR_DB_PATH=/bear/data/database.sqlite
+      - UI_ENABLE_CHORUS_CONVENTIONS=true
+      - UI_ENABLE_CONTENT_REPLACEMENT=true
+      # Skips system tests in `task pack` (Taskfile.yml:43)
+      - CI=true
+    stdin_open: true
+    tty: true
+
+volumes:
+  node_modules:
