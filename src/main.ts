@@ -185,7 +185,7 @@ server.registerTool(
 
       // Fallback: create was dispatched but ID not recoverable for verification
       const responseLines: string[] = [
-        'Note created (unverified — could not recover note ID).',
+        'Note created (dispatched, unverified — could not recover note ID).',
         'Use bear-search-notes to confirm.',
         '',
       ];
@@ -529,12 +529,12 @@ server.registerTool(
         }
 
         return createToolResponse(
-          `File add sent but verification failed — "${filename}" not yet in database.\n\n${noteIdentifier}\nCheck Bear manually.`
+          `File add (dispatched, unverified) — "${filename}" not yet in database.\n\n${noteIdentifier}\nCheck Bear manually.`
         );
       }
 
       return createToolResponse(
-        `File "${filename}" added (unverified — could not resolve note ID).\n\n${noteIdentifier}`
+        `File "${filename}" added (dispatched, unverified — could not resolve note ID).\n\n${noteIdentifier}`
       );
     } catch (error) {
       logger.error('bear-add-file failed:', error);
@@ -717,7 +717,7 @@ server.registerTool(
       if (alreadyPresent) {
         const tagList = tags.map((t) => `#${t}`).join(', ');
         return createToolResponse(
-          `Tags already present on note "${existingNote.title}".\n\nTags: ${tagList}\nNote ID: ${id}`
+          `Tags already present (state confirmed).\n\nNote: "${existingNote.title}"\nTags: ${tagList}\nNote ID: ${id}`
         );
       }
 
@@ -811,7 +811,7 @@ Use bear-search-notes to find the correct note identifier.`);
       }
 
       return createToolResponse(
-        `Archive command sent but verification failed — note "${existingNote.title}" may not be archived.\n\nID: ${id}\nCheck Bear manually.`
+        `Note archive (dispatched, unverified) — could not confirm note "${existingNote.title}" was archived.\n\nID: ${id}\nCheck Bear manually.`
       );
     } catch (error) {
       logger.error('bear-archive-note failed:', error);
@@ -874,7 +874,7 @@ server.registerTool(
       }
 
       return createToolResponse(
-        `Rename command sent but verification failed — could not confirm #${name} was renamed to #${new_name}.\n\nCheck Bear manually.`
+        `Tag rename (dispatched, unverified) — could not confirm #${name} was renamed to #${new_name}.\n\nCheck Bear manually.`
       );
     } catch (error) {
       logger.error('bear-rename-tag failed:', error);
@@ -928,7 +928,7 @@ server.registerTool(
       }
 
       return createToolResponse(
-        `Delete command sent but verification failed — #${name} may still exist.\n\nCheck Bear manually.`
+        `Tag delete (dispatched, unverified) — #${name} may still exist.\n\nCheck Bear manually.`
       );
     } catch (error) {
       logger.error('bear-delete-tag failed:', error);
@@ -1032,7 +1032,7 @@ server.registerTool(
         // Skip the write if content is already identical (idempotent no-op)
         if (bodyWithTags === preWriteText) {
           return createToolResponse(
-            `Note already matches the provided content.\n\nNote ID: ${resolvedId}\nTitle: "${existingNote.title}"`
+            `Note already matches the provided content (state confirmed).\n\nNote ID: ${resolvedId}\nTitle: "${existingNote.title}"`
           );
         }
 
@@ -1090,7 +1090,7 @@ server.registerTool(
         }
 
         return createToolResponse(
-          'Note created (unverified — could not recover note ID). Use bear-search-notes to confirm.'
+          'Note created (dispatched, unverified — could not recover note ID). Use bear-search-notes to confirm.'
         );
       }
     } catch (error) {
@@ -1152,7 +1152,7 @@ server.registerTool(
       }
 
       return createToolResponse(
-        `Trash command sent but verification failed — note "${existingNote.title}" may not be trashed.\n\nID: ${id}\nCheck Bear manually.`
+        `Note trash (dispatched, unverified) — could not confirm note "${existingNote.title}" was trashed.\n\nID: ${id}\nCheck Bear manually.`
       );
     } catch (error) {
       logger.error('bear-trash-note failed:', error);
