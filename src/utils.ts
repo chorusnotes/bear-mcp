@@ -462,7 +462,7 @@ Use bear-open-note to inspect the current state of the note.`);
 
     const preposition = mode === 'replace' ? 'in' : 'to';
     const responseLines = [
-      `Text ${action} ${preposition} note "${existingNote.title}" (verified).`,
+      `Text ${action} ${preposition} note "${existingNote.title}" (state confirmed).`,
       '',
     ];
 
