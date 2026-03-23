@@ -16,9 +16,9 @@
     "format": "prettier --write src",
     "format:check": "prettier --check src",
     "check": "npm run lint:check && npm run format:check",
-    "fix": "npm run lint && npm run format",
-    "prepublishOnly": "npm run build"
+    "fix": "npm run lint && npm run format"
   },
+  "private": true,
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",
     "debug": "^4.4.3",
@@ -63,16 +63,5 @@
   "bugs": {
     "url": "https://github.com/chorusnotes/bear-mcp/issues"
   },
-  "homepage": "https://github.com/chorusnotes/bear-mcp#readme",
-  "bin": {
-    "bear-notes-mcp": "dist/main.js"
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE.md"
-  ],
-  "publishConfig": {
-    "access": "public"
-  }
+  "homepage": "https://github.com/chorusnotes/bear-mcp#readme"
 }

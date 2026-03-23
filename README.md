@@ -42,7 +42,7 @@ bear-mcp reads back from Bear's database after every mutating operation and chec
 
 - macOS (Bear is Apple-only)
 - [Bear](https://bear.app) installed
-- Node.js 18+
+- Node.js 24.13.0+
 - Claude Desktop or any MCP-compatible client
 
 ## Install
