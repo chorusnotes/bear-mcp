@@ -66,11 +66,6 @@ tasks:
     cmds:
       - npx mcpb info {{.BUNDLE_NAME}}
   
-  docs:sync:
-    desc: Sync tools list from manifest.json into README.md and docs/NPM.md
-    cmds:
-      - node scripts/sync-tools-to-docs.mjs
-  
   version:
     desc: Update version across all files
     interactive: true
@@ -94,12 +89,6 @@ tasks:
         echo "Version updated to {{.VERSION}} in package.json, manifest.json, and src/config.ts"
       - npm install --package-lock-only
 
-  prepare-release:
-    desc: Prepare release by updating version and docs
-    cmds:
-      - task: docs:sync
-      - task: version
-  
   push-release:
     desc: Commit, tag, and push a release
     requires:
@@ -118,21 +107,3 @@ tasks:
         git tag -a "v{{.VERSION}}" -m "release: {{.VERSION}}"
         git push --follow-tags
   
-  changelog:
-    silent: true
-    desc: Extract changelog for specific version
-    vars:
-      VERSION: '{{.VERSION | default "1.0.0"}}'
-    cmds:
-      - |
-        if [ ! -f CHANGELOG.md ]; then
-          echo "CHANGELOG.md not found"
-          exit 1
-        fi
-        
-        # Extract content between ## [VERSION] and next ## section
-        sed -n "/^## \[{{.VERSION}}\]/,/^## \[/p" CHANGELOG.md | \
-        sed '$d' | \
-        tail -n +3 | \
-        sed '/^$/d'
-
