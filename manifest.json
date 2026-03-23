@@ -1,11 +1,11 @@
 {
   "manifest_version": "0.3",
   "name": "bear-notes-chorus",
-  "display_name": "Bear Notes Chorus",
+  "display_name": "Chorus Notes Bear",
   "version": "26.03.23.1",
   "icon": "icon.png",
-  "description": "Bear Notes MCP fork for Chorus workflows, with note conventions, tag preservation, and upsert support.",
-  "long_description": "Personal Chorus-oriented fork of the Bear Notes MCP. Includes Chorus note conventions, tag-preserving full-body replace behavior, H1 section splice handling, bear-upsert-note, bear-trash-note, and bear-get-tags. Based on vasylenko/claude-desktop-extension-bear-notes under MIT.",
+  "description": "Chorus Notes for Bear.app — structured writing with verified writes.",
+  "long_description": "Bear Notes MCP server with section-level editing, YAML frontmatter conventions, tag preservation, and post-write verification. Part of Chorus Notes.",
   "author": {
     "name": "N8K",
     "url": "https://github.com/heyn8k"
@@ -34,14 +34,14 @@
       "type": "boolean",
       "title": "Chorus Conventions",
       "description": "Enforce Chorus note structure (YAML frontmatter, H1 title, tag mirroring) on create and upsert operations. Validates structure on replace.",
-      "default": false,
+      "default": true,
       "required": false
     },
     "enable_content_replacement": {
       "type": "boolean",
       "title": "Content Replacement",
       "description": "Allow replacing note content or specific sections using the bear-replace-text tool",
-      "default": false,
+      "default": true,
       "required": false
     }
   },

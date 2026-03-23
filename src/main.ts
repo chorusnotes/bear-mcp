@@ -523,7 +523,9 @@ server.registerTool(
 
         while (Date.now() < deadline) {
           if (noteFileExists(resolvedId, filename)) {
-            return createToolResponse(`File "${filename}" added (state confirmed).\n\n${noteIdentifier}`);
+            return createToolResponse(
+              `File "${filename}" added (state confirmed).\n\n${noteIdentifier}`
+            );
           }
           await wait(25);
         }
@@ -868,7 +870,9 @@ server.registerTool(
 
       while (Date.now() < deadline) {
         if (!tagExists(name) && tagExists(new_name)) {
-          return createToolResponse(`Tag renamed (state confirmed).\n\nFrom: #${name}\nTo: #${new_name}`);
+          return createToolResponse(
+            `Tag renamed (state confirmed).\n\nFrom: #${name}\nTo: #${new_name}`
+          );
         }
         await wait(25);
       }
