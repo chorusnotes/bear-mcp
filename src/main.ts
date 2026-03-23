@@ -126,7 +126,7 @@ server.registerTool(
   {
     title: 'Create New Note',
     description:
-      'Create a new note in your Bear library with optional title, content, and tags. Returns the note ID when a title is provided, enabling immediate follow-up operations. The note will be immediately available in Bear app.',
+      'Create a new note in your Bear library with optional title, content, and tags. Returns the note ID when a title is provided and the note is confirmed in the database.',
     inputSchema: {
       title: z
         .string()
@@ -942,7 +942,7 @@ server.registerTool(
   {
     title: 'Create or Replace Note',
     description:
-      'Create a new Bear note or replace an existing one entirely. If a note with the given ID exists (or a unique title match is found), replaces it with the provided content while preserving tags. If no match, creates a new note. Returns the note as it actually exists after the operation — not just "success".',
+      'Create a new Bear note or replace an existing one entirely. If a note with the given ID exists (or a unique title match is found), replaces it with the provided content while preserving tags. If no match, creates a new note. Returns the note content after the operation for confirmation.',
     inputSchema: {
       id: z
         .string()
@@ -1105,7 +1105,7 @@ server.registerTool(
   {
     title: 'Trash Bear Note',
     description:
-      "Move a note to Bear's trash. Unlike archive, trashed notes are eventually deleted. Verifies the note was actually trashed via database check. Use bear-search-notes first to get the note ID.",
+      "Move a note to Bear's trash. Unlike archive, trashed notes are eventually deleted. Confirms the trash state via database check. Use bear-search-notes first to get the note ID.",
     inputSchema: {
       id: z
         .string()

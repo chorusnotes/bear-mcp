@@ -96,11 +96,11 @@
     },
     {
       "name": "bear-upsert-note",
-      "description": "Create a new note or replace an existing one entirely, with tag preservation and verified write-back"
+      "description": "Create a new note or replace an existing one entirely, with tag preservation and post-write state confirmation"
     },
     {
       "name": "bear-trash-note",
-      "description": "Move a note to Bear's trash with database verification that the trash operation succeeded"
+      "description": "Move a note to Bear's trash with database state confirmation"
     },
     {
       "name": "bear-get-tags",

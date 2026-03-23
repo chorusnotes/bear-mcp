@@ -27,7 +27,19 @@ The server uses two distinct paths to interact with Bear, chosen to avoid corrup
 
 **Why not just use the database for everything?** Writing directly to Bear's Core Data SQLite would risk corruption — Bear doesn't expect external writers and could overwrite changes or crash.
 
-**Why not just use x-callback-url for everything?** Bear's x-callback-url has no x-success callback that works without a running server to receive it. Reads via URL would require polling or a callback server. Direct SQLite is faster and simpler for reads.
+### Bear's URL Scheme and Verification
+
+Bear supports x-success callbacks that return useful data for several operations:
+- `/create` returns `identifier` and `title`
+- `/add-text` returns `note` (full body) and `title`
+- `/add-file` returns `note` (full body)
+- `/trash`, `/archive`, `/rename-tag`, `/delete-tag` have no documented return values
+
+However, the MCP server cannot natively receive these callbacks — x-callback-url requires a macOS app bundle with a registered URL scheme to accept the response. The server is a Node.js process without URL scheme registration.
+
+SQLite read-after-write is the primary verification model by design, not by limitation. It checks persisted state — what Bear actually wrote to disk — which is a stronger trust source than Bear's x-callback-url self-report. The x-callback-url bridge remains a future consideration for additional confirmation signal.
+
+**Why not just use x-callback-url for everything?** Reads via URL would require a callback receiver or polling. Direct SQLite is faster and simpler for reads.
 
 ### Fire-and-Forget Write Model
 
@@ -69,7 +81,7 @@ Bear uses Core Data with SQLite. The schema is undocumented — our understandin
 ### Bear's URL Scheme Quirks
 
 - **Space encoding**: Bear expects `%20`, not `+`. `URLSearchParams` encodes spaces as `+` by default, so a global replace is applied after encoding.
-- **No response data**: Unlike standard x-callback-url, Bear's implementation doesn't return data via x-success in a way the server can capture without a callback receiver.
+- **No response capture**: Bear's x-success callbacks return useful data (note body, ID), but the server has no registered URL scheme to receive them. See "Bear's URL Scheme and Verification" above.
 - **Note creation has no ID in response**: After creating a note, the server polls the database to find the new note's ID by title match. This is best-effort and may time out.
 
 ### Platform Constraints
@@ -81,7 +93,7 @@ Bear uses Core Data with SQLite. The schema is undocumented — our understandin
 
 - **Encrypted notes**: Bear encrypts content in the DB. Excluded from all queries.
 - **Per-tag pinning**: Bear's URL scheme supports `pin=yes` for global pinning but has no action for pinning within a specific tag.
-- **Write verification**: No way to confirm Bear processed a URL action. Exit code 0 from `open` only means macOS accepted the URL, not that Bear acted on it.
+- **Write verification**: Exit code 0 from `open` only means macOS accepted the URL, not that Bear acted on it. The server uses SQLite read-after-write polling to confirm state changes. See "Verification Contract" below for the per-tool certainty matrix.
 
 ---
 
@@ -105,6 +117,36 @@ Neither tier uses the MCP SDK's `isError` field — this is a potential future i
 - **System tests require a live Bear installation** — they create real notes, modify them, and verify results. Cannot run in CI.
 - **System tests share Bear state** — they run sequentially, each suite managing its own test data with unique prefixes and cleanup in afterAll.
 - **Write operation timing** — after a URL write, tests pause briefly before reading back via SQLite, giving Bear time to process the callback.
+
+---
+
+## Verification Contract
+
+Every write tool emits one of two certainty tiers in its response string:
+
+- **state confirmed** — DB state change confirmed (flag, tag, row, heuristic checks passed)
+- **dispatched, unverified** — request sent, no post-state confirmation
+
+For text-write operations, "state confirmed" means heuristic post-write checks passed (text changed, no doubled YAML/H1, tags preserved), not exact expected-vs-actual content equality.
+
+### Per-Tool Verification Matrix
+
+| Tool | Path | Evidence Checked | Tier | Limitations | Fallback |
+|------|------|-----------------|------|-------------|----------|
+| bear-create-note | Poll succeeds | Note row exists with expected title | state confirmed | Title collision: awaitNoteCreation matches most recent note with exact title in 10s window | dispatched, unverified |
+| bear-create-note | Poll fails/no title | None | dispatched, unverified | No post-state confirmation possible | — |
+| bear-add-text | Verification passes | Text changed + no doubled YAML/H1 + tags preserved | state confirmed | Heuristic checks only | Explicit failure with diagnostics |
+| bear-replace-text | Verification passes | Text changed + no doubled YAML/H1 + tags preserved | state confirmed | Heuristic checks only | Explicit failure with diagnostics |
+| bear-add-file | File row found | Filename row in ZSFNOTEFILE linked to note | state confirmed | Checks row existence, not content integrity | dispatched, unverified |
+| bear-add-tag | Verification passes | Text changed + no doubled YAML/H1 + tags preserved | state confirmed | Heuristic checks only | Explicit failure with diagnostics |
+| bear-add-tag | Tags already present | Tags checked in DB, all present | state confirmed (no-op) | No write performed | — |
+| bear-archive-note | Flag confirmed | ZARCHIVED = 1 | state confirmed | — | dispatched, unverified |
+| bear-trash-note | Flag confirmed | ZTRASHED = 1 | state confirmed | — | dispatched, unverified |
+| bear-rename-tag | Old gone + new present | !tagExists(old) && tagExists(new) | state confirmed | Does not verify note membership preservation | dispatched, unverified |
+| bear-delete-tag | Tag absent | !tagExists(name) | state confirmed | Global absence check only | dispatched, unverified |
+| bear-upsert-note (replace) | Verification passes | Text changed + no doubled YAML/H1 + tags preserved | state confirmed | Heuristic checks only | Explicit failure with diagnostics |
+| bear-upsert-note (create) | Poll succeeds | Note row exists with expected title | state confirmed | Same title collision risk as bear-create-note | dispatched, unverified |
+| bear-upsert-note (idempotent) | Content already matches | Pre-write body equals proposed body | state confirmed (no-op) | No write performed | — |
 
 ---
 

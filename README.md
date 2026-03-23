@@ -10,8 +10,10 @@ bear-mcp reads back from Bear's database after every mutating operation and chec
 
 ## What it does
 
-**Write verification:**
-- Post-write read-back checks on all mutating operations
+**Write verification (certainty model):**
+- Post-write read-back checks on all mutating operations with explicit certainty labeling:
+  - *state confirmed* — database state change confirmed (flag, tag, heuristic checks passed)
+  - *dispatched, unverified* — request sent, no post-state confirmation possible
 - Tag preservation across full-body replacements
 - Section replace via splice (prevents append-instead-of-replace failures)
 - Sub-section preservation on parent header replacement
@@ -35,7 +37,7 @@ bear-mcp reads back from Bear's database after every mutating operation and chec
 - `bear-find-untagged-notes` — find notes missing tags
 - `bear-list-tags` — hierarchical tag tree
 - `bear-rename-tag` / `bear-delete-tag` — tag management
-- `bear-archive-note` / `bear-trash-note` — with database verification
+- `bear-archive-note` / `bear-trash-note` — with database state confirmation
 
 
 ## Requirements
