@@ -1,11 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run:*)",
+      "Bash(pnpm run:*)",
       "Bash(grep:*)",
-      "Bash(npm install:*)",
-      "Bash(npm outdated)",
-      "Bash(npm update:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm outdated)",
+      "Bash(pnpm update:*)",
       "Bash(find:*)",
       "Bash(git checkout:*)",
       "Bash(git log:*)",

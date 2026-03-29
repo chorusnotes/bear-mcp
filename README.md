@@ -52,8 +52,8 @@ bear-mcp reads back from Bear's database after every mutating operation and chec
 ```bash
 git clone https://github.com/chorusnotes/bear-mcp.git
 cd bear-mcp
-npm install
-npm run build
+pnpm install
+pnpm run build
 ```
 
 Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):

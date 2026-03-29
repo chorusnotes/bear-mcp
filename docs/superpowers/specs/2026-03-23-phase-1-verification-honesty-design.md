@@ -89,7 +89,7 @@ Replace all verification-related response strings with the three-tier model defi
 Update failing system test assertions to match new response wording.
 
 **Prerequisites:**
-- Run `npm run test:system` and produce an actual inventory of failing assertions. Do not carry forward the unverified count of "9" — count the real failures and categorize each one.
+- Run `pnpm run test:system` and produce an actual inventory of failing assertions. Do not carry forward the unverified count of "9" — count the real failures and categorize each one.
 - Confirm all failures are pure string assertion mismatches, not tests of verification behavior that changes under new labeling. If any test asserts on verification behavior rather than response strings, that is a separate task.
 - Note: some tests may be stale against the *current* code (e.g., asserting "deleted successfully" when the code already says "Tag deleted (verified)"). These need updating to match Phase 1 labels directly — there is no intermediate step.
 

@@ -30,8 +30,8 @@ coverage/
 .env.*
 !.env.example
 
-# npm
-.npm
+# pnpm
+.pnpm-store
 *.tgz
 
 # macOS

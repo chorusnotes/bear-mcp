@@ -37,7 +37,7 @@ export function callTool({ toolName, args, env }: CallToolOptions): ToolResponse
     cliArgs.push('--tool-arg', `${key}=${value}`);
   }
 
-  const result = spawnSync('npx', cliArgs, {
+  const result = spawnSync('pnpm', ['exec', ...cliArgs], {
     encoding: 'utf-8',
     timeout: TOOL_CALL_TIMEOUT,
   });

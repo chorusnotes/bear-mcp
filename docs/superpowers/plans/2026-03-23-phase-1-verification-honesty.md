@@ -143,7 +143,7 @@ with:
 
 - [ ] **Step 10: Run unit tests**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: All 53 unit tests pass (response string changes don't affect unit tests)
 
 - [ ] **Step 11: Commit**
@@ -173,7 +173,7 @@ with:
 
 - [ ] **Step 2: Run unit tests**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: All 53 pass
 
 - [ ] **Step 3: Commit**
@@ -313,7 +313,7 @@ Expected: Zero matches. This pattern targets the exact parenthesized label, avoi
 
 - [ ] **Step 12: Run unit tests**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: All 53 pass
 
 - [ ] **Step 13: Commit**
@@ -340,7 +340,7 @@ The 5 behavioral failures are pre-existing and unrelated to Phase 1. They must n
 
 - [ ] **Step 1: Run system tests and record current baseline**
 
-Run: `npx vitest run --config vitest.system.config.ts 2>&1 | tee /tmp/system-test-baseline.txt`
+Run: `pnpm exec vitest run --config vitest.system.config.ts 2>&1 | tee /tmp/system-test-baseline.txt`
 Confirm 32 passing / 9 failing. Record this as the pre-Phase-1 baseline.
 
 - [ ] **Step 2: Verify the 4 stale assertions are string mismatches**
@@ -393,7 +393,7 @@ with:
 
 - [ ] **Step 4: Run system tests and confirm improvement**
 
-Run: `npx vitest run --config vitest.system.config.ts`
+Run: `pnpm exec vitest run --config vitest.system.config.ts`
 Expected: 36 passing / 5 failing (4 fewer failures than baseline). The 5 remaining failures are pre-existing behavioral issues — not regressions. Confirm no new failures were introduced.
 
 - [ ] **Step 5: Commit**
@@ -516,7 +516,7 @@ Review each match. Variable names and function names (`verification`, `verifyNot
 
 - [ ] **Step 8: Run unit tests**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: All 53 pass
 
 - [ ] **Step 9: Commit**
@@ -604,7 +604,7 @@ Create `tests/system/normalization.test.ts` with:
 
 - [ ] **Step 2: Run the normalization test**
 
-Run: `npx vitest run --config vitest.system.config.ts tests/system/normalization.test.ts`
+Run: `pnpm exec vitest run --config vitest.system.config.ts tests/system/normalization.test.ts`
 Record all results. For any mismatches, document exactly what changed.
 
 - [ ] **Step 3: Classify result as clean/predictable/unpredictable**
@@ -651,7 +651,7 @@ Add tests to the unit test suite for:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: New tests fail with "computeExpectedBody is not defined"
 
 - [ ] **Step 3: Implement computeExpectedBody**
@@ -660,7 +660,7 @@ In `src/utils.ts`, add the function. Centralize all expected-body formulas. If T
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: All tests pass including new ones
 
 - [ ] **Step 5: Upgrade verifyNoteAfterWrite signature**
@@ -688,7 +688,7 @@ Where `verifyNoteAfterWrite` returns `contentMatched: true`, change the response
 
 - [ ] **Step 8: Run all tests**
 
-Run: `npm test && npm run test:system`
+Run: `pnpm test && pnpm run test:system`
 Expected: All pass
 
 - [ ] **Step 9: Commit**
@@ -733,8 +733,8 @@ git commit -m "docs: document Bear normalization findings — content comparison
 
 After Tasks 1–5 complete, verify these criteria for release:
 
-- [ ] `npm test` — all 53 unit tests pass
-- [ ] `npx vitest run --config vitest.system.config.ts` — 36 passing / 5 failing (the 4 stale assertions fixed, 5 pre-existing behavioral failures preserved, zero new failures introduced)
+- [ ] `pnpm test` — all 53 unit tests pass
+- [ ] `pnpm exec vitest run --config vitest.system.config.ts` — 36 passing / 5 failing (the 4 stale assertions fixed, 5 pre-existing behavioral failures preserved, zero new failures introduced)
 - [ ] `grep -n '(verified)' src/main.ts src/utils.ts` — zero matches
 - [ ] Every write-tool success path emits one of: "state confirmed" or "dispatched, unverified"
 - [ ] Every write-tool failure path retains "verification FAILED" with diagnostics

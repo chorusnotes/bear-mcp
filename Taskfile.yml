@@ -12,19 +12,19 @@ tasks:
   inspector:
     desc: Run MCP inspector with Web UI
     cmds:
-      - npx @modelcontextprotocol/inspector node dist/main.js
+      - pnpm exec @modelcontextprotocol/inspector node dist/main.js
       
   setup:
     desc: Project setup (install + build)
     cmds:
-      - npm install
-      - npm run build 
+      - pnpm install
+      - pnpm run build 
 
   style:
     desc: Runs linter and formatter with fixes
     cmds:
-      - npm run lint
-      - npm run format
+      - pnpm run lint
+      - pnpm run format
   
   clean:
     desc: Clean build artifacts
@@ -35,9 +35,9 @@ tasks:
     desc: Build with quality checks
     deps: [clean]
     cmds:
-      - npm run check
-      - npm run test
-      - npm run build
+      - pnpm run check
+      - pnpm run test
+      - pnpm run build
       
   test:system:
     desc: Run system tests with MCP Inspector CLI
@@ -45,7 +45,7 @@ tasks:
     status:
       - test "$CI" = "true"
     cmds:
-      - npm run test:system
+      - pnpm run test:system
 
 
   # === Bundle Build ===
@@ -58,15 +58,15 @@ tasks:
       - task: test:system # In CI, when skipped, this will be considered as success run
       - rm -rf tmp/bundle && mkdir -p tmp/bundle
       - cp -r dist/*.js manifest.json assets/* package.json tmp/bundle/
-      - cd tmp/bundle && npx mcpb validate manifest.json
-      - cd tmp/bundle && npm install --omit=dev    
-      - npx mcpb pack tmp/bundle {{.BUNDLE_NAME}}
+      - cd tmp/bundle && pnpm exec mcpb validate manifest.json
+      - cd tmp/bundle && pnpm install --prod    
+      - pnpm exec mcpb pack tmp/bundle {{.BUNDLE_NAME}}
       - echo "Bundle created {{.BUNDLE_NAME}}"   
     
   info:
     desc: Show bundle info
     cmds:
-      - npx mcpb info {{.BUNDLE_NAME}}
+      - pnpm exec mcpb info {{.BUNDLE_NAME}}
   
   version:
     desc: Update version across all files
@@ -89,7 +89,7 @@ tasks:
         sed -i '' "s/export const APP_VERSION = '[^']*'/export const APP_VERSION = '{{.VERSION}}'/" src/config.ts
         
         echo "Version updated to {{.VERSION}} in package.json, manifest.json, and src/config.ts"
-      - npm install --package-lock-only
+      - pnpm install --lockfile-only
 
   push-release:
     desc: Commit, tag, and push a release

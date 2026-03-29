@@ -5,8 +5,8 @@
         "UI_ENABLE_CHORUS_CONVENTIONS": "true",
         "UI_ENABLE_CONTENT_REPLACEMENT": "true"
       },
-      "command": "npx",
-      "args": ["tsx", "src/main.ts"]
+      "command": "pnpm",
+      "args": ["exec", "tsx", "src/main.ts"]
     }
   }
 }
