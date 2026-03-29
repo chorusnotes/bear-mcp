@@ -6,7 +6,7 @@ A hardened [MCP server](https://modelcontextprotocol.io/) for [Bear Notes](https
 
 Bear's x-callback-url API has no write confirmation. You send a command, Bear says nothing back. Every MCP server built on this API — including the one this project grew from — reports success whether the write landed or not. That means silent failures: doubled content, lost tags, appended-instead-of-replaced text, all reported as "success."
 
-bear-mcp reads back from Bear's database after every mutating operation and checks for common failure modes. When something goes wrong, it says so.
+bear-mcp reads back from Bear's database after every mutating operation and checks for common failure modes. When something goes wrong, it says so. The only thing that survives a reset is what you've confirmed to be true.
 
 ## What it does
 
