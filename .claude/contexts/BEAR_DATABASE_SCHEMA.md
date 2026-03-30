@@ -1,4 +1,4 @@
-# Bear Notes SQLite Database Schema Documentation - SEPTEMBER 06, 2025
+# Bear Notes SQLite Database Schema Documentation
 
 ## Overview
 Bear Notes stores all data in a Core Data SQLite database located at:

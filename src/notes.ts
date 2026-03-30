@@ -76,7 +76,7 @@ function formatBearNote(row: Record<string, unknown>): BearNote {
  * Note: Always includes OCR'd text from attached images and PDFs with clear labeling
  */
 export function getNoteContent(identifier: string): BearNote | null {
-  logger.info(`getNoteContent called with identifier: ${identifier}, includeFiles: always`);
+  logger.info(`getNoteContent called with identifier: ${identifier}`);
 
   if (!identifier || typeof identifier !== 'string' || !identifier.trim()) {
     logAndThrow('Database error: Invalid note identifier provided');
@@ -146,7 +146,6 @@ export function getNoteContent(identifier: string): BearNote | null {
   } finally {
     closeBearDatabase(db);
   }
-  return null;
 }
 
 /**

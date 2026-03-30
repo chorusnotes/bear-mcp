@@ -78,7 +78,7 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 
 ## Status
 
-`26.03.23` — actively developed. See the [Chorus Notes org](https://github.com/chorusnotes) for project context.
+`26.03.30` — actively developed. See the [Chorus Notes org](https://github.com/chorusnotes) for project context.
 
 ## License
 
